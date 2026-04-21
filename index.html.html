@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KamkeCargo · Sistema de Despacho</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+:root {
+  --navy: #14213d;
+  --navy2: #1e2e52;
+  --orange: #e85d04;
+  --orange2: #f48c06;
+  --white: #ffffff;
+  --g50: #f7f8fc;
+  --g100: #eef0f8;
+  --g200: #d5d9e8;
+  --g400: #8892b0;
+  --g600: #4a5475;
+  --g800: #1a2045;
+  --green: #16a34a;
+  --red: #dc2626;
+  --mono: 'Space Mono', monospace;
+  --cond: 'Barlow Condensed', sans-serif;
+  --sans: 'Barlow', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:var(--sans); background:var(--g50); color:var(--g800); min-height:100vh; }
+
+/* HEADER */
+.hdr {
+  background:var(--navy);
+  height:58px;
+  display:flex;
+  align-items:center;
+  padding:0 24px;
+  gap:32px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 2px 16px rgba(0,0,0,.4);
+}
+.logo {
+  font-family:var(--cond);
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:2px;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  white-space:nowrap;
+}
+.logo em { color:var(--orange); font-style:normal; }
+.logo svg { width:28px; height:28px; }
+.nav { display:flex; gap:4px; }
+.nbtn {
+  background:none;
+  border:none;
+  color:rgba(255,255,255,.55);
+  font-family:var(--cond);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.8px;
+  text-transform:uppercase;
+  padding:7px 15px;
+  border-radius:6px;
+  cursor:pointer;
+  transition:.18s;
+}
+.nbtn:hover { background:rgba(255,255,255,.08); color:#fff; }
+.nbtn.on { background:var(--orange); color:#fff; }
+
+/* OPERATOR PILL in header */
+.op-pill {
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:20px;
+  padding:5px 14px 5px 10px;
+  color:#fff;
+  font-family:var(--cond);
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.4px;
+  cursor:pointer;
+  transition:.18s;
+  white-space:nowrap;
+}
+.op-pill:hover { background:rgba(255,255,255,.14); }
+.op-dot {
+  width:8px; height:8px;
+  border-radius:50%;
+  background:var(--green);
+  flex-shrink:0;
+}
+
+/* FROM-CALC BADGE */
+.from-calc-badge {
+  display:none;
+  align-items:center;
+  gap:6px;
+  background:linear-gradient(90deg,#eff6ff,#dbeafe);
+  border:1.5px solid #93c5fd;
+  border-radius:8px;
+  padding:8px 14px;
+  font-size:12.5px;
+  color:#1e40af;
+  font-weight:600;
+  margin-bottom:14px;
+}
+.from-calc-badge.show { display:flex; }
+.from-calc-badge button {
+  margin-left:auto;
+  background:none;
+  border:none;
+  color:#1e40af;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
+  text-decoration:underline;
+  font-family:var(--sans);
+}
+
+/* PASS-TO-GUIDE button area */
+.calc-action {
+  margin-top:18px;
+  padding:16px;
+  background:linear-gradient(135deg,#fff7ed,#fff);
+  border:2px dashed var(--orange);
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.calc-action .ca-txt {
+  font-size:13px;
+  color:var(--g600);
+  line-height:1.5;
+}
+.calc-action .ca-txt strong { color:var(--navy); }
+
+/* CONTENT */
+.wrap { max-width:1020px; margin:0 auto; padding:28px 20px; }
+.panel { display:none; }
+.panel.on { display:block; }
+
+/* CARD */
+.card {
+  background:#fff;
+  border-radius:12px;
+  padding:22px 24px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.04);
+  margin-bottom:18px;
+}
+.ctitle {
+  font-family:var(--cond);
+  font-size:16px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.8px;
+  color:var(--navy);
+  margin-bottom:18px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.ctitle::after {
+  content:'';
+  flex:1;
+  height:2px;
+  background:var(--g100);
+  border-radius:2px;
+}
+
+/* GRIDS */
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+.g4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; }
+.span2 { grid-column:span 2; }
+
+/* FIELD */
+.f { display:flex; flex-direction:column; gap:5px; }
+.f label {
+  font-size:10.5px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.9px;
+  color:var(--g400);
+}
+.f input, .f select, .f textarea {
+  border:1.5px solid var(--g200);
+  border-radius:8px;
+  padding:9px 12px;
+  font-family:var(--sans);
+  font-size:14px;
+  color:var(--g800);
+  background:#fff;
+  outline:none;
+  transition:.15s;
+}
+.f input:focus, .f select:focus, .f textarea:focus {
+  border-color:var(--orange);
+  box-shadow:0 0 0 3px rgba(232,93,4,.1);
+}
+.f .mono { font-family:var(--mono); font-size:13px; }
+.req { color:var(--orange); }
+
+/* SECTION LABEL */
+.slbl {
+  font-family:var(--cond);
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--g400);
+  border-bottom:2px solid var(--g100);
+  padding-bottom:6px;
+  margin:18px 0 14px;
+}
+.slbl:first-child { margin-top:0; }
+
+/* PRICE BOX */
+.pbox {
+  background:var(--navy);
+  border-radius:10px;
+  padding:20px;
+  color:#fff;
+}
+.prow {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  font-size:13.5px;
+}
+.prow:last-child { border:none; }
+.prow .pl { color:rgba(255,255,255,.6); }
+.prow .pv { font-family:var(--mono); font-weight:700; }
+.prow.ptot {
+  margin-top:8px;
+  padding-top:14px;
+  border-top:2px solid var(--orange) !important;
+}
+.prow.ptot .pl { font-size:15px; font-weight:600; color:#fff; }
+.prow.ptot .pv { font-size:22px; color:var(--orange2); }
+.badge {
+  font-size:9.5px;
+  font-weight:800;
+  letter-spacing:1px;
+  padding:2px 7px;
+  border-radius:4px;
+  background:var(--orange);
+  color:#fff;
+  text-transform:uppercase;
+}
+
+/* BUTTONS */
+.btn {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:10px 20px;
+  border-radius:8px;
+  border:none;
+  font-family:var(--cond);
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.6px;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:.18s;
+  white-space:nowrap;
+}
+.btn:hover { transform:translateY(-1px); }
+.btnP { background:var(--orange); color:#fff; }
+.btnP:hover { background:var(--orange2); }
+.btnN { background:var(--navy); color:#fff; }
+.btnN:hover { background:var(--navy2); }
+.btnO { background:#fff; color:var(--navy); border:2px solid var(--navy); }
+.btnO:hover { background:var(--navy); color:#fff; }
+.btnG { background:var(--green); color:#fff; }
+.btnG:hover { filter:brightness(1.1); }
+.btnR { background:var(--red); color:#fff; }
+.btns { display:flex; gap:10px; margin-top:22px; flex-wrap:wrap; }
+
+/* STATS */
+.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+.scard {
+  background:#fff;
+  border-radius:10px;
+  padding:18px;
+  border-left:4px solid var(--orange);
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.slb { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.9px; color:var(--g400); margin-bottom:5px; }
+.svl { font-family:var(--mono); font-size:22px; font-weight:700; color:var(--navy); }
+.svl.sm { font-size:15px; }
+
+/* TABLE */
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th {
+  background:var(--g50);
+  font-family:var(--cond);
+  font-weight:800;
+  font-size:10.5px;
+  text-transform:uppercase;
+  letter-spacing:.9px;
+  color:var(--g400);
+  padding:9px 11px;
+  text-align:left;
+  border-bottom:2px solid var(--g100);
+}
+tbody td {
+  padding:10px 11px;
+  border-bottom:1px solid var(--g100);
+  color:var(--g600);
+  vertical-align:middle;
+}
+tbody tr:hover td { background:var(--g50); }
+.mc { font-family:var(--mono); font-size:12px; }
+
+/* ALERT */
+.alert {
+  padding:11px 16px;
+  border-radius:8px;
+  font-size:13.5px;
+  margin-bottom:14px;
+  display:none;
+}
+.alert.ok { background:#dcfce7; color:#166534; border:1px solid #86efac; display:block; }
+.alert.er { background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; display:block; }
+.alert.in { background:#eff6ff; color:#1e40af; border:1px solid #93c5fd; display:block; }
+
+/* TAG */
+.dtag {
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  background:var(--g100);
+  color:var(--g600);
+  font-size:11.5px;
+  font-weight:600;
+  padding:3px 8px;
+  border-radius:4px;
+}
+
+/* ACTION BTN */
+.ab {
+  background:none;
+  border:none;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  text-decoration:underline;
+  font-family:var(--sans);
+}
+.ab.view { color:var(--orange); }
+.ab.del { color:var(--red); }
+
+/* MODAL */
+.overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  backdrop-filter:blur(4px);
+  z-index:200;
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+.overlay.on { display:flex; }
+.modal {
+  background:#fff;
+  border-radius:16px;
+  max-width:480px;
+  width:92%;
+  max-height:90vh;
+  overflow-y:auto;
+  padding:28px;
+  box-shadow:0 24px 60px rgba(0,0,0,.3);
+}
+
+/* INFO BOX */
+.ibox {
+  background:var(--g50);
+  border-radius:8px;
+  padding:14px;
+  font-size:13px;
+  margin-bottom:18px;
+  display:grid;
+  gap:6px;
+  line-height:1.5;
+}
+.ibox strong { color:var(--navy); }
+
+/* ======================== */
+/* GUÍA IMPRIMIBLE          */
+/* ======================== */
+#pw { display:none; }
+
+#gp {
+  font-family:'Courier New', monospace;
+  font-size:11.5px;
+  color:#000;
+  background:#fff;
+  width:390px;
+  padding:20px;
+  border:2.5px solid #000;
+  margin:16px auto;
+}
+#gp .gh {
+  text-align:center;
+  border-bottom:3px double #000;
+  padding-bottom:12px;
+  margin-bottom:12px;
+}
+#gp .gh .gempresa {
+  font-size:19px;
+  font-weight:900;
+  letter-spacing:3px;
+  font-family:Arial, sans-serif;
+  text-transform:uppercase;
+}
+#gp .gh .gsubtitle {
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:2px;
+  margin-top:3px;
+  font-family:Arial, sans-serif;
+}
+#gp .gh .gnum {
+  display:inline-block;
+  margin-top:10px;
+  background:#000;
+  color:#fff;
+  padding:4px 14px;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:1px;
+}
+#gp .gs {
+  border:1px solid #bbb;
+  border-radius:3px;
+  padding:9px 10px;
+  margin-bottom:9px;
+}
+#gp .gst {
+  font-family:Arial,sans-serif;
+  font-size:9.5px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:#555;
+  border-bottom:1px solid #ddd;
+  padding-bottom:5px;
+  margin-bottom:7px;
+}
+#gp .gr { display:flex; margin-bottom:5px; line-height:1.4; }
+#gp .gk {
+  font-family:Arial,sans-serif;
+  font-size:9.5px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+  min-width:130px;
+  color:#333;
+  flex-shrink:0;
+}
+#gp .gv {
+  font-family:Arial,sans-serif;
+  font-size:11px;
+  font-weight:700;
+}
+#gp .ph {
+  background:#000;
+  color:#fff;
+  padding:8px 12px;
+  text-align:center;
+  margin:10px 0;
+  border-radius:3px;
+}
+#gp .ph .plb { font-family:Arial,sans-serif; font-size:9.5px; letter-spacing:1.5px; text-transform:uppercase; opacity:.75; }
+#gp .ph .pv { font-size:26px; font-weight:900; letter-spacing:1px; }
+#gp .ba { text-align:center; margin-top:14px; padding-top:10px; border-top:1px dashed #bbb; }
+#gp .gf {
+  text-align:center;
+  font-family:Arial,sans-serif;
+  font-size:9px;
+  color:#666;
+  margin-top:10px;
+  padding-top:8px;
+  border-top:1px solid #ccc;
+  line-height:1.6;
+}
+
+/* PRINT STYLES */
+@media print {
+  body > *:not(#pw) { display:none !important; }
+  #pw { display:block !important; }
+  #gp { border:none; width:100%; padding:0; }
+  @page { size:A5 portrait; margin:8mm; }
+}
+
+/* CONFIG */
+.cfgitem {
+  padding:12px 0;
+  border-bottom:1px solid var(--g100);
+}
+.cfgitem:last-child { border:none; }
+
+/* LOGIN MODAL special */
+.login-modal {
+  background:var(--navy);
+  border-radius:16px;
+  max-width:380px;
+  width:92%;
+  padding:32px;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+  text-align:center;
+}
+.login-modal h2 {
+  font-family:var(--cond);
+  font-size:24px;
+  font-weight:900;
+  color:#fff;
+  letter-spacing:1px;
+  margin-bottom:4px;
+}
+.login-modal p {
+  color:rgba(255,255,255,.6);
+  font-size:13px;
+  margin-bottom:22px;
+}
+.login-modal select, .login-modal input {
+  width:100%;
+  border:2px solid rgba(255,255,255,.2);
+  border-radius:8px;
+  padding:11px 14px;
+  font-family:var(--sans);
+  font-size:15px;
+  color:#fff;
+  background:rgba(255,255,255,.08);
+  outline:none;
+  margin-bottom:12px;
+  transition:.15s;
+}
+.login-modal select:focus, .login-modal input:focus {
+  border-color:var(--orange);
+}
+.login-modal select option { background:var(--navy2); color:#fff; }
+
+/* TARIFF INFO */
+.tinfo {
+  background:linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
+  border-radius:10px;
+  padding:20px;
+  color:#fff;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+  margin-bottom:18px;
+}
+.ti { text-align:center; }
+.ti .tl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; opacity:.65; margin-bottom:6px; }
+.ti .tv { font-family:var(--mono); font-size:20px; font-weight:700; color:var(--orange2); }
+
+/* RESPONSIVE */
+@media(max-width:640px) {
+  .g2,.g3,.g4 { grid-template-columns:1fr; }
+  .span2 { grid-column:span 1; }
+  .stats { grid-template-columns:1fr 1fr; }
+  .tinfo { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="28" height="28" rx="6" fill="#e85d04"/>
+      <path d="M3 18h16l3-8H6L3 18z" fill="#fff" opacity=".9"/>
+      <rect x="5" y="20" width="4" height="2" rx="1" fill="#fff"/>
+      <rect x="17" y="20" width="4" height="2" rx="1" fill="#fff"/>
+    </svg>
+    KAMKE<em>CARGO</em>
+  </div>
+  <nav class="nav">
+    <button class="nbtn on" onclick="showTab('calc',this)">🧮 Calculadora</button>
+    <button class="nbtn" onclick="showTab('guia',this)">📦 Nueva Guía</button>
+    <button class="nbtn" onclick="showTab('mani',this)">📋 Manifesto</button>
+    <button class="nbtn" onclick="showTab('cfg',this)">⚙️ Config</button>
+  </nav>
+  <div class="op-pill" onclick="changeOperator()" title="Click para cambiar operador">
+    <span class="op-dot"></span>
+    <span id="hdr-op">—</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ═══ CALCULADORA ═══ -->
+<div id="tab-calc" class="panel on">
+  <div class="tinfo">
+    <div class="ti"><div class="tl">Costo Fijo</div><div class="tv">$22.000</div></div>
+    <div class="ti"><div class="tl">Por Kg (IVA inc.)</div><div class="tv">$257</div></div>
+    <div class="ti"><div class="tl">Por m³ (IVA inc.)</div><div class="tv">$92.820</div></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">🧮 Calculadora de Tarifas</div>
+    <div class="g2">
+      <div>
+        <div class="slbl">Medidas del Bulto</div>
+        <div class="g3" style="margin-bottom:14px;">
+          <div class="f"><label>Largo (cm)</label><input type="number" id="cl" min="0" placeholder="0" oninput="calc()"></div>
+          <div class="f"><label>Ancho (cm)</label><input type="number" id="ca" min="0" placeholder="0" oninput="calc()"></div>
+          <div class="f"><label>Alto (cm)</label><input type="number" id="ch" min="0" placeholder="0" oninput="calc()"></div>
+        </div>
+        <div class="f">
+          <label>Peso Real (kg)</label>
+          <input type="number" id="ck" min="0" step="0.1" placeholder="0.0" class="mono" oninput="calc()" style="font-size:20px;padding:13px;">
+        </div>
+        <div style="margin-top:14px;padding:12px;background:var(--g50);border-radius:8px;font-size:12.5px;color:var(--g600);line-height:1.7;">
+          <strong>Fórmula:</strong> $22.000 fijo + mayor entre:<br>
+          &nbsp;· Por peso: kg × $257<br>
+          &nbsp;· Por volumen: m³ × $92.820<br>
+          <span style="color:var(--orange);font-weight:600;">La base marcada como BASE es la que aplica.</span>
+        </div>
+        <div class="calc-action">
+          <div class="ca-txt">
+            <strong>¿Listo el precio?</strong><br>
+            Pasa estos datos directamente a la nueva guía sin volver a ingresar las medidas.
+          </div>
+          <button class="btn btnP" onclick="pasarAGuia()">Crear Guía →</button>
+        </div>
+      </div>
+      <div>
+        <div class="slbl">Desglose del Precio</div>
+        <div class="pbox">
+          <div class="prow">
+            <span class="pl">Costo fijo</span>
+            <span class="pv">$22.000</span>
+          </div>
+          <div class="prow">
+            <span class="pl">Volumen calculado</span>
+            <span class="pv" id="r_vm">0,0000 m³</span>
+          </div>
+          <div class="prow">
+            <span class="pl" style="display:flex;align-items:center;gap:6px;">
+              Por volumen <span id="bdg_v" class="badge" style="display:none">BASE</span>
+            </span>
+            <span class="pv" id="r_pv">$0</span>
+          </div>
+          <div class="prow">
+            <span class="pl" style="display:flex;align-items:center;gap:6px;">
+              Por peso <span id="bdg_k" class="badge" style="display:none">BASE</span>
+            </span>
+            <span class="pv" id="r_pk">$0</span>
+          </div>
+          <div class="prow ptot">
+            <span class="pl">TOTAL A COBRAR</span>
+            <span class="pv" id="r_tot">$22.000</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ NUEVA GUÍA ═══ -->
+<div id="tab-guia" class="panel">
+  <div id="alrt-guia" class="alert"></div>
+  <form id="fg" onsubmit="genGuia(event)">
+
+    <div class="card">
+      <div class="ctitle">📤 Remitente — quien envía</div>
+      <div class="g2">
+        <div class="f"><label>Nombre Completo <span class="req">*</span></label><input name="rn" required placeholder="Juan Pérez García"></div>
+        <div class="f"><label>RUT</label><input name="rr" placeholder="12.345.678-9" class="mono" oninput="fmtRut(this)"></div>
+        <div class="f"><label>Dirección</label><input name="rd" placeholder="Av. Ejemplo 1234"></div>
+        <div class="f"><label>Teléfono</label><input name="rt" placeholder="+56 9 1234 5678"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle">📥 Destinatario — quien recibe</div>
+      <div class="g2">
+        <div class="f"><label>Nombre Completo <span class="req">*</span></label><input name="dn" required placeholder="María González López"></div>
+        <div class="f"><label>RUT</label><input name="dr" placeholder="11.222.333-4" class="mono" oninput="fmtRut(this)"></div>
+        <div class="f"><label>Dirección <span class="req">*</span></label><input name="dd" required placeholder="Calle Principal 567"></div>
+        <div class="f"><label>Teléfono</label><input name="dt" placeholder="+56 9 8765 4321"></div>
+        <div class="f span2"><label>Localidad / Ciudad <span class="req">*</span></label><input name="dl" required placeholder="Santiago Centro, Punta Arenas..."></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ctitle">🚚 Datos del Envío</div>
+      <div class="g2">
+        <div class="f">
+          <label>Origen <span class="req">*</span></label>
+          <select name="ori">
+            <option value="Puerto Varas">Puerto Varas</option>
+            <option value="Puerto Montt">Puerto Montt</option>
+            <option value="Osorno">Osorno</option>
+            <option value="Valdivia">Valdivia</option>
+            <option value="Temuco">Temuco</option>
+            <option value="Concepción">Concepción</option>
+            <option value="Santiago">Santiago</option>
+            <option value="Mendoza">Mendoza (ARG)</option>
+            <option value="Buenos Aires">Buenos Aires (ARG)</option>
+          </select>
+        </div>
+        <div class="f"><label>Destino <span class="req">*</span></label><input name="dst" required placeholder="Punta Arenas, Mendoza, Osorno..."></div>
+        <div class="f"><label>Contenido <span class="req">*</span></label><input name="cnt" required placeholder="Documentos, Repuestos, Mercadería..."></div>
+        <div class="f"><label>Valor Declarado ($)</label><input name="vd" type="number" min="0" placeholder="0" class="mono"></div>
+        <div class="f span2"><label>Observaciones</label><input name="obs" placeholder="Frágil, urgente, refrigerado..."></div>
+      </div>
+      <!-- Tipo de servicio siempre ESTÁNDAR -->
+      <input type="hidden" name="svc" value="ESTÁNDAR">
+    </div>
+
+    <div class="card">
+      <div class="ctitle">📐 Medidas y Precio Final</div>
+      <div id="from-calc-badge" class="from-calc-badge">
+        ⚡ Medidas cargadas desde la Calculadora
+        <button type="button" onclick="limpiarMedidas()">Limpiar</button>
+      </div>
+      <div class="g4">
+        <div class="f"><label>Peso Real (kg) <span class="req">*</span></label><input name="kg" id="gk" type="number" required min="0.01" step="0.01" placeholder="0.0" class="mono" oninput="gCalc()"></div>
+        <div class="f"><label>Largo (cm)</label><input name="gl" id="gl" type="number" min="0" placeholder="0" oninput="gCalc()"></div>
+        <div class="f"><label>Ancho (cm)</label><input name="ga" id="ga" type="number" min="0" placeholder="0" oninput="gCalc()"></div>
+        <div class="f"><label>Alto (cm)</label><input name="gh" id="gh" type="number" min="0" placeholder="0" oninput="gCalc()"></div>
+      </div>
+      <div style="margin-top:18px;">
+        <div class="pbox">
+          <div class="prow">
+            <span class="pl">Costo fijo</span>
+            <span class="pv">$22.000</span>
+          </div>
+          <div class="prow">
+            <span class="pl" id="gbl">Base de cálculo</span>
+            <span class="pv" id="gbv">—</span>
+          </div>
+          <div class="prow ptot">
+            <span class="pl">TOTAL A COBRAR</span>
+            <span class="pv" id="gtot">$22.000</span>
+          </div>
+        </div>
+      </div>
+      <div class="slbl" style="margin-top:16px;">Datos del Operador</div>
+      <div class="f">
+        <label>Atendido por <span style="color:var(--green);font-size:10px;">(● sesión activa)</span></label>
+        <input name="atd" id="atd" placeholder="Inicia sesión para autocompletar"
+          style="background:var(--g50);color:var(--g600);" readonly>
+      </div>
+    </div>
+
+    <div class="btns">
+      <button type="submit" class="btn btnP">📄 Generar Guía</button>
+      <button type="button" class="btn btnO" onclick="resetFg()">🗑 Limpiar</button>
+    </div>
+  </form>
+</div>
+
+<!-- ═══ MANIFESTO ═══ -->
+<div id="tab-mani" class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-family:var(--cond);font-size:20px;font-weight:800;color:var(--navy);">📋 MANIFESTO DEL DÍA</span>
+      <input type="date" id="fdate" onchange="renderMani()"
+        style="border:1.5px solid var(--g200);border-radius:8px;padding:8px 12px;font-family:var(--sans);font-size:14px;outline:none;color:var(--g800);">
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btnG" onclick="sendReport()">📧 Enviar Reporte</button>
+      <button class="btn btnN" onclick="printMani()">🖨 Imprimir Manifesto</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="scard"><div class="slb">Guías del día</div><div class="svl" id="sct">0</div></div>
+    <div class="scard"><div class="slb">Kg total</div><div class="svl" id="skg">0,0</div></div>
+    <div class="scard"><div class="slb">Total a cobrar</div><div class="svl sm" id="stot">$0</div></div>
+    <div class="scard"><div class="slb">Destinos únicos</div><div class="svl" id="sdst">0</div></div>
+  </div>
+
+  <div id="alrt-mani" class="alert"></div>
+
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div id="mtbl"></div>
+  </div>
+</div>
+
+<!-- ═══ CONFIG ═══ -->
+<div id="tab-cfg" class="panel">
+  <div class="card">
+    <div class="ctitle">⚙️ Configuración de la Empresa</div>
+    <div class="g2">
+      <div class="f"><label>Nombre de la Empresa</label><input id="ce" placeholder="Transportes Kamke" oninput="saveCfg()"></div>
+      <div class="f"><label>Dirección Oficina</label><input id="cd" placeholder="Puerto Varas, Los Lagos" oninput="saveCfg()"></div>
+      <div class="f"><label>Teléfono / WhatsApp</label><input id="ct" placeholder="+56 9 XXXX XXXX" oninput="saveCfg()"></div>
+      <div class="f"><label>Lista de Operadores <span style="font-weight:400;text-transform:none;letter-spacing:0;">(separados por coma)</span></label>
+        <input id="cops" placeholder="Juan Pérez, María González, Carlos López" oninput="saveCfg()">
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;background:#eff6ff;border-radius:8px;font-size:12.5px;color:#1e40af;">
+      💡 Los operadores listados aquí aparecerán en el selector al iniciar sesión en el sistema.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📧 Configuración de Email (EmailJS)</div>
+    <div class="g2">
+      <div class="f"><label>Email Destino del Reporte <span class="req">*</span></label><input id="cem" type="email" placeholder="gerencia@transkamke.com" oninput="saveCfg()"></div>
+      <div class="f"><label>EmailJS Service ID</label><input id="csvc" class="mono" placeholder="service_gl216t6" oninput="saveCfg()"></div>
+      <div class="f"><label>EmailJS Template ID</label><input id="ctpl" class="mono" placeholder="template_682vtzc" oninput="saveCfg()"></div>
+      <div class="f"><label>EmailJS Public Key</label><input id="ckey" class="mono" placeholder="eGIGxWgojzInGVVdx" oninput="saveCfg()"></div>
+    </div>
+    <div style="margin-top:14px;padding:12px;background:var(--g50);border-radius:8px;font-size:12.5px;color:var(--g600);line-height:1.7;">
+      ℹ️ Ve a <strong>emailjs.com</strong> → tu cuenta → Email Services para obtener el Service ID y Public Key.<br>
+      Crea un nuevo Template con los parámetros: <code style="background:var(--g100);padding:1px 4px;border-radius:3px;">subject</code>, <code style="background:var(--g100);padding:1px 4px;border-radius:3px;">message</code>, <code style="background:var(--g100);padding:1px 4px;border-radius:3px;">to_email</code>, <code style="background:var(--g100);padding:1px 4px;border-radius:3px;">empresa</code>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📊 Tarifas Vigentes (IVA incluido)</div>
+    <div class="tinfo">
+      <div class="ti"><div class="tl">Costo Fijo</div><div class="tv">$22.000</div></div>
+      <div class="ti"><div class="tl">Por Kilo</div><div class="tv">$257 / kg</div></div>
+      <div class="ti"><div class="tl">Por Metro Cúbico</div><div class="tv">$92.820 / m³</div></div>
+    </div>
+    <p style="font-size:12.5px;color:var(--g400);">Para modificar las tarifas edita las constantes en el código fuente (TARIFA_FIJA, TARIFA_KG, TARIFA_M3).</p>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">💾 Gestión de Datos</div>
+    <p style="font-size:13.5px;color:var(--g600);margin-bottom:16px;">Todos los datos se guardan en este navegador. Puedes exportarlos como respaldo.</p>
+    <div class="btns" style="margin-top:0;">
+      <button class="btn btnN" onclick="expData()">⬇ Exportar JSON</button>
+      <button class="btn btnO" style="border-color:var(--red);color:var(--red);"
+        onclick="if(confirm('¿Eliminar TODAS las guías? Esto no se puede deshacer.'))
+          {localStorage.removeItem('kg_guias');renderMani();showAlrt('mani','Datos eliminados.','in');}">
+        🗑 Eliminar Todo
+      </button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<!-- MODAL GUÍA GENERADA -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:44px;">✅</div>
+      <div style="font-family:var(--cond);font-size:22px;font-weight:900;color:var(--navy);margin-top:6px;">GUÍA GENERADA</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--orange);margin-top:4px;" id="m_id"></div>
+    </div>
+    <div class="ibox" id="m_info"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btnP" style="flex:1;" onclick="printGuia()">🖨 Imprimir Guía</button>
+      <button class="btn btnO" style="flex:1;" onclick="closeModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRINT WRAPPER — Solo visible al imprimir -->
+<div id="pw">
+  <div id="gp">
+    <div class="gh">
+      <div class="gempresa" id="gp_emp">TRANSPORTES KAMKE</div>
+      <div class="gsubtitle">GUÍA DE DESPACHO NACIONAL</div>
+      <div class="gnum" id="gp_num">KMK-00000000-0000</div>
+    </div>
+
+    <div class="gs">
+      <div class="gst">📤 REMITENTE</div>
+      <div class="gr"><span class="gk">NOMBRE:</span><span class="gv" id="gp_rn"></span></div>
+      <div class="gr"><span class="gk">RUT:</span><span class="gv" id="gp_rr"></span></div>
+      <div class="gr"><span class="gk">DIRECCIÓN:</span><span class="gv" id="gp_rd"></span></div>
+      <div class="gr"><span class="gk">TELÉFONO:</span><span class="gv" id="gp_rt"></span></div>
+    </div>
+
+    <div class="gs">
+      <div class="gst">📥 DESTINATARIO</div>
+      <div class="gr"><span class="gk">NOMBRE:</span><span class="gv" id="gp_dn"></span></div>
+      <div class="gr"><span class="gk">RUT:</span><span class="gv" id="gp_dr"></span></div>
+      <div class="gr"><span class="gk">DIRECCIÓN:</span><span class="gv" id="gp_dd"></span></div>
+      <div class="gr"><span class="gk">TELÉFONO:</span><span class="gv" id="gp_dt"></span></div>
+      <div class="gr"><span class="gk">LOCALIDAD:</span><span class="gv" id="gp_dl"></span></div>
+    </div>
+
+    <div class="gs">
+      <div class="gst">🚚 INFORMACIÓN DEL ENVÍO</div>
+      <div class="gr"><span class="gk">ORIGEN:</span><span class="gv" id="gp_ori"></span></div>
+      <div class="gr"><span class="gk">DESTINO:</span><span class="gv" id="gp_dst"></span></div>
+      <div class="gr"><span class="gk">SERVICIO:</span><span class="gv" id="gp_svc"></span></div>
+      <div class="gr"><span class="gk">CONTENIDO:</span><span class="gv" id="gp_cnt"></span></div>
+      <div class="gr"><span class="gk">PESO FÍSICO:</span><span class="gv" id="gp_kk"></span></div>
+      <div class="gr"><span class="gk">PESO VOLUMÉTRICO:</span><span class="gv" id="gp_vm"></span></div>
+      <div class="gr"><span class="gk">DIMENSIONES:</span><span class="gv" id="gp_dim"></span></div>
+      <div class="gr"><span class="gk">VALOR DECLARADO:</span><span class="gv" id="gp_vd"></span></div>
+      <div id="gp_obs_row" class="gr"><span class="gk">OBSERVACIONES:</span><span class="gv" id="gp_obs"></span></div>
+    </div>
+
+    <div class="ph">
+      <div class="plb">VALOR A COBRAR</div>
+      <div class="pv" id="gp_prc">$0</div>
+    </div>
+
+    <div class="gs" style="margin-bottom:0;">
+      <div class="gr"><span class="gk">FECHA ADMISIÓN:</span><span class="gv" id="gp_fch"></span></div>
+      <div class="gr"><span class="gk">OFICINA ORIGEN:</span><span class="gv" id="gp_ofi"></span></div>
+      <div class="gr"><span class="gk">ATENDIDO POR:</span><span class="gv" id="gp_atd"></span></div>
+      <div class="gr"><span class="gk">NRO. OPERACIÓN:</span><span class="gv" id="gp_nop"></span></div>
+    </div>
+
+    <div class="ba">
+      <svg id="gp_bc"></svg>
+      <div style="font-size:11px;margin-top:3px;letter-spacing:1px;" id="gp_bcn"></div>
+    </div>
+
+    <div class="gf">
+      Guarda esta guía para futuras consultas asociadas a tu envío.<br>
+      El destinatario tiene 5 días hábiles para retirar en la oficina de destino.<br>
+      <span id="gp_tel_footer"></span>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="overlay" id="modal-login" style="z-index:300;">
+  <div class="login-modal">
+    <div style="font-size:40px;margin-bottom:12px;">👤</div>
+    <h2>¿Quién está operando?</h2>
+    <p>Selecciona tu nombre para continuar.<br>Quedará registrado en cada guía que generes.</p>
+    <select id="login-select">
+      <option value="">— Seleccionar operador —</option>
+    </select>
+    <div style="font-size:12px;color:rgba(255,255,255,.4);margin:-4px 0 10px;">¿No estás en la lista? Ingresa tu nombre:</div>
+    <input type="text" id="login-input" placeholder="Tu nombre completo..." oninput="syncLoginInput()">
+    <button class="btn btnP" style="width:100%;justify-content:center;font-size:16px;padding:13px;" onclick="doLogin()">
+      Ingresar al Sistema →
+    </button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════
+// TARIFAS
+// ═══════════════════════
+const TARIFA_FIJA = 22000;
+const TARIFA_KG   = 257;
+const TARIFA_M3   = 92820;
+
+// ═══════════════════════
+// INIT
+// ═══════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  loadCfg();
+  const hoy = new Date().toISOString().slice(0,10);
+  document.getElementById('fdate').value = hoy;
+  renderMani();
+  // Check if operator is set for this session
+  const op = sessionStorage.getItem('kg_op');
+  if (op) {
+    setOperator(op);
+  } else {
+    showLoginModal();
+  }
+});
+
+// ═══════════════════════
+// OPERATOR SESSION
+// ═══════════════════════
+function showLoginModal() {
+  const c = getCfg();
+  const sel = document.getElementById('login-select');
+  // Clear and repopulate
+  sel.innerHTML = '<option value="">— Seleccionar operador —</option>';
+  if (c.ops) {
+    c.ops.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+  }
+  document.getElementById('modal-login').classList.add('on');
+}
+
+function syncLoginInput() {
+  // When typing manually, clear the select
+  const inp = document.getElementById('login-input').value;
+  if (inp) document.getElementById('login-select').value = '';
+}
+
+function doLogin() {
+  const sel = document.getElementById('login-select').value;
+  const inp = document.getElementById('login-input').value.trim();
+  const name = sel || inp;
+  if (!name) { alert('Por favor selecciona o ingresa tu nombre.'); return; }
+  setOperator(name);
+  document.getElementById('modal-login').classList.remove('on');
+}
+
+function setOperator(name) {
+  sessionStorage.setItem('kg_op', name);
+  document.getElementById('hdr-op').textContent = name;
+  const atd = document.getElementById('atd');
+  if (atd) atd.value = name;
+}
+
+function changeOperator() {
+  // Reset inputs and show modal
+  document.getElementById('login-input').value = '';
+  document.getElementById('login-select').value = '';
+  showLoginModal();
+}
+
+// ═══════════════════════
+// CONFIG
+// ═══════════════════════
+function getCfg() {
+  return JSON.parse(localStorage.getItem('kg_cfg') || '{}');
+}
+function loadCfg() {
+  const c = getCfg();
+  document.getElementById('ce').value   = c.emp  || 'TRANSPORTES KAMKE';
+  document.getElementById('cd').value   = c.dir  || 'Puerto Varas, Los Lagos';
+  document.getElementById('ct').value   = c.tel  || '';
+  document.getElementById('cops').value = c.ops  || '';
+  document.getElementById('cem').value  = c.email|| '';
+  document.getElementById('csvc').value = c.esvc || 'service_gl216t6';
+  document.getElementById('ctpl').value = c.etpl || 'template_682vtzc';
+  document.getElementById('ckey').value = c.ekey || 'eGIGxWgojzInGVVdx';
+}
+function saveCfg() {
+  localStorage.setItem('kg_cfg', JSON.stringify({
+    emp:  document.getElementById('ce').value,
+    dir:  document.getElementById('cd').value,
+    tel:  document.getElementById('ct').value,
+    ops:  document.getElementById('cops').value,
+    email:document.getElementById('cem').value,
+    esvc: document.getElementById('csvc').value,
+    etpl: document.getElementById('ctpl').value,
+    ekey: document.getElementById('ckey').value,
+  }));
+}
+
+// ═══════════════════════
+// TABS
+// ═══════════════════════
+function showTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
+  document.getElementById('tab-' + name).classList.add('on');
+  btn.classList.add('on');
+  if (name === 'mani') renderMani();
+  if (name === 'guia') {
+    // Always sync operator from session
+    const op = sessionStorage.getItem('kg_op');
+    const atd = document.getElementById('atd');
+    if (atd && op) atd.value = op;
+  }
+}
+
+// ═══════════════════════
+// PRECIO
+// ═══════════════════════
+function precio(kg, l, a, h) {
+  const vm  = (l * a * h) / 1e6;
+  const ppk = kg * TARIFA_KG;
+  const ppv = vm * TARIFA_M3;
+  const base = ppk >= ppv ? 'kg' : 'vol';
+  return {
+    vm,
+    ppk: Math.round(ppk),
+    ppv: Math.round(ppv),
+    base,
+    tot: Math.round(TARIFA_FIJA + Math.max(ppk, ppv))
+  };
+}
+
+function fmt(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
+
+// Calculadora tab
+function calc() {
+  const k = +document.getElementById('ck').value || 0;
+  const l = +document.getElementById('cl').value || 0;
+  const a = +document.getElementById('ca').value || 0;
+  const h = +document.getElementById('ch').value || 0;
+  const p = precio(k, l, a, h);
+  document.getElementById('r_vm').textContent = p.vm.toFixed(4) + ' m³';
+  document.getElementById('r_pv').textContent = fmt(p.ppv);
+  document.getElementById('r_pk').textContent = fmt(p.ppk);
+  document.getElementById('r_tot').textContent = fmt(p.tot);
+  document.getElementById('bdg_v').style.display = p.base === 'vol' ? 'inline' : 'none';
+  document.getElementById('bdg_k').style.display = p.base === 'kg'  ? 'inline' : 'none';
+}
+
+// Guía form calc
+function gCalc() {
+  const k = +document.getElementById('gk').value || 0;
+  const l = +document.getElementById('gl').value || 0;
+  const a = +document.getElementById('ga').value || 0;
+  const h = +document.getElementById('gh').value || 0;
+  const p = precio(k, l, a, h);
+  if (p.base === 'kg') {
+    document.getElementById('gbl').textContent = `Por peso (${k} kg × $${TARIFA_KG})`;
+    document.getElementById('gbv').textContent = fmt(p.ppk);
+  } else {
+    document.getElementById('gbl').textContent = `Por volumen (${p.vm.toFixed(4)} m³ × $${TARIFA_M3.toLocaleString('es-CL')})`;
+    document.getElementById('gbv').textContent = fmt(p.ppv);
+  }
+  document.getElementById('gtot').textContent = fmt(p.tot);
+}
+
+// ═══════════════════════
+// PASAR CALC → GUÍA
+// ═══════════════════════
+function pasarAGuia() {
+  const k = document.getElementById('ck').value;
+  const l = document.getElementById('cl').value;
+  const a = document.getElementById('ca').value;
+  const h = document.getElementById('ch').value;
+  if (!k || +k <= 0) {
+    alert('Ingresa al menos el peso en la calculadora antes de continuar.');
+    return;
+  }
+  // Switch to guía tab
+  const btn = document.querySelectorAll('.nbtn')[1]; // "Nueva Guía" button
+  showTab('guia', btn);
+  // Fill medidas fields
+  document.getElementById('gk').value = k;
+  document.getElementById('gl').value = l || '';
+  document.getElementById('ga').value = a || '';
+  document.getElementById('gh').value = h || '';
+  // Show badge
+  document.getElementById('from-calc-badge').classList.add('show');
+  // Trigger price calc
+  gCalc();
+  // Scroll to medidas card
+  setTimeout(() => {
+    document.getElementById('gk').scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 150);
+}
+
+function limpiarMedidas() {
+  document.getElementById('gk').value = '';
+  document.getElementById('gl').value = '';
+  document.getElementById('ga').value = '';
+  document.getElementById('gh').value = '';
+  document.getElementById('from-calc-badge').classList.remove('show');
+  document.getElementById('gbl').textContent = 'Base de cálculo';
+  document.getElementById('gbv').textContent = '—';
+  document.getElementById('gtot').textContent = '$22.000';
+}
+
+// ═══════════════════════
+// GENERAR GUÍA
+// ═══════════════════════
+let guiaActual = null;
+
+function genGuia(e) {
+  e.preventDefault();
+  const fd = new FormData(document.getElementById('fg'));
+  const c  = getCfg();
+
+  const kg = +fd.get('kg') || 0;
+  const l  = +fd.get('gl') || 0;
+  const a  = +fd.get('ga') || 0;
+  const h  = +fd.get('gh') || 0;
+  const p  = precio(kg, l, a, h);
+
+  const now     = new Date();
+  const dateKey = now.toISOString().slice(0,10).replace(/-/g,'');
+  const guias   = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const hoyN    = guias.filter(g => g.id.includes(dateKey)).length;
+  const seq     = String(hoyN + 1).padStart(4,'0');
+  const id      = `KMK-${dateKey}-${seq}`;
+  const nop     = String(Math.floor(Math.random()*900000)+100000);
+
+  const g = {
+    id, nop,
+    fecha: now.toISOString(),
+    rem: { n: fd.get('rn'), r: fd.get('rr')||'—', d: fd.get('rd')||'—', t: fd.get('rt')||'—' },
+    dst: { n: fd.get('dn'), r: fd.get('dr')||'—', d: fd.get('dd'), t: fd.get('dt')||'—', l: fd.get('dl') },
+    ori: fd.get('ori'),
+    des: fd.get('dst'),
+    svc: fd.get('svc'),
+    cnt: fd.get('cnt'),
+    vd:  +fd.get('vd') || 0,
+    obs: fd.get('obs') || '',
+    kg, l, a, h, p,
+    atd: fd.get('atd') || sessionStorage.getItem('kg_op') || '—'
+  };
+
+  guias.push(g);
+  localStorage.setItem('kg_guias', JSON.stringify(guias));
+  guiaActual = g;
+  prepPrint(g);
+
+  // Clear from-calc badge after generating
+  document.getElementById('from-calc-badge').classList.remove('show');
+
+  document.getElementById('m_id').textContent = id;
+  document.getElementById('m_info').innerHTML = `
+    <strong>Remitente:</strong> ${g.rem.n}<br>
+    <strong>Destinatario:</strong> ${g.dst.n}<br>
+    <strong>Ruta:</strong> ${g.ori} → ${g.des} (${g.dst.l})<br>
+    <strong>Peso:</strong> ${kg} kg · Vol: ${p.vm.toFixed(4)} m³<br>
+    <div style="font-size:18px;font-weight:700;color:var(--orange);margin-top:6px;">TOTAL: ${fmt(p.tot)}</div>
+  `;
+  document.getElementById('modal').classList.add('on');
+}
+
+// ═══════════════════════
+// PREPARAR IMPRESIÓN
+// ═══════════════════════
+function prepPrint(g) {
+  const c   = getCfg();
+  const fch = new Date(g.fecha);
+  const fstr = fch.toLocaleDateString('es-CL') + ' ' + fch.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
+  const dims = (g.l && g.a && g.h) ? `${g.l} × ${g.a} × ${g.h} cm` : '—';
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+
+  set('gp_emp', c.emp || 'TRANSPORTES KAMKE');
+  set('gp_num', g.id);
+  set('gp_rn',  g.rem.n); set('gp_rr', g.rem.r); set('gp_rd', g.rem.d); set('gp_rt', g.rem.t);
+  set('gp_dn',  g.dst.n); set('gp_dr', g.dst.r); set('gp_dd', g.dst.d); set('gp_dt', g.dst.t); set('gp_dl', g.dst.l);
+  set('gp_ori', g.ori);
+  set('gp_dst', g.des);
+  set('gp_svc', g.svc);
+  set('gp_cnt', g.cnt);
+  set('gp_kk',  g.kg + ' kg');
+  set('gp_vm',  g.p.vm.toFixed(4) + ' m³');
+  set('gp_dim', dims);
+  set('gp_vd',  g.vd ? fmt(g.vd) : '—');
+  set('gp_prc', fmt(g.p.tot));
+  set('gp_fch', fstr);
+  set('gp_ofi', (c.emp || 'TRANSPORTES KAMKE') + ' · ' + g.ori);
+  set('gp_atd', g.atd);
+  set('gp_nop', g.nop);
+  set('gp_tel_footer', c.tel ? 'Contacto: ' + c.tel : '');
+
+  const obsRow = document.getElementById('gp_obs_row');
+  if (g.obs) {
+    set('gp_obs', g.obs);
+    if (obsRow) obsRow.style.display = 'flex';
+  } else {
+    if (obsRow) obsRow.style.display = 'none';
+  }
+
+  set('gp_bcn', g.id);
+  try {
+    JsBarcode('#gp_bc', g.id, { format:'CODE128', width:2, height:48, displayValue:false, background:'#fff', lineColor:'#000' });
+  } catch(_) {}
+}
+
+function printGuia() {
+  closeModal();
+  setTimeout(() => window.print(), 150);
+}
+
+function printMani() {
+  alert('Para imprimir el manifesto usa Ctrl+P (Cmd+P en Mac). Asegúrate de seleccionar "Guardar como PDF" o tu impresora.');
+}
+
+// ═══════════════════════
+// MANIFESTO
+// ═══════════════════════
+function renderMani() {
+  const fecha  = document.getElementById('fdate').value;
+  const guias  = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const items  = guias.filter(g => g.fecha.startsWith(fecha));
+  const totKg  = items.reduce((s,g) => s + (g.kg||0), 0);
+  const totCob = items.reduce((s,g) => s + (g.p?.tot||0), 0);
+  const uDsts  = new Set(items.map(g => g.des)).size;
+
+  document.getElementById('sct').textContent  = items.length;
+  document.getElementById('skg').textContent  = totKg.toFixed(1);
+  document.getElementById('stot').textContent = fmt(totCob);
+  document.getElementById('sdst').textContent = uDsts;
+
+  const tbl = document.getElementById('mtbl');
+  if (!items.length) {
+    tbl.innerHTML = `<div style="text-align:center;padding:48px 20px;color:var(--g400);">
+      <div style="font-size:52px;margin-bottom:12px;">📦</div>
+      <div style="font-family:var(--cond);font-size:17px;font-weight:700;">Sin guías para esta fecha</div>
+      <div style="font-size:13px;margin-top:6px;">Crea una nueva guía en la pestaña 📦 Nueva Guía</div>
+    </div>`;
+    return;
+  }
+
+  const rows = items.map(g => {
+    const hora = new Date(g.fecha).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
+    return `<tr>
+      <td class="mc" style="font-weight:700;color:var(--navy);">${g.id}</td>
+      <td style="color:var(--g400);font-size:12px;">${hora}</td>
+      <td>${g.rem.n}</td>
+      <td>${g.dst.n}</td>
+      <td><span class="dtag">📍 ${g.des}</span></td>
+      <td class="mc">${g.kg} kg</td>
+      <td class="mc" style="font-weight:700;color:var(--navy);">${fmt(g.p?.tot||0)}</td>
+      <td>
+        <button class="ab view" onclick="verG('${g.id}')">Ver</button>
+        &nbsp;
+        <button class="ab del" onclick="delG('${g.id}')">Eliminar</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const totalRow = `<tr style="background:var(--g50);">
+    <td colspan="5" style="text-align:right;font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--g400);">TOTAL DEL DÍA</td>
+    <td class="mc" style="font-weight:700;">${totKg.toFixed(1)} kg</td>
+    <td class="mc" style="font-weight:700;color:var(--orange);">${fmt(totCob)}</td>
+    <td></td>
+  </tr>`;
+
+  tbl.innerHTML = `<table>
+    <thead><tr>
+      <th>N° Guía</th><th>Hora</th><th>Remitente</th>
+      <th>Destinatario</th><th>Destino</th><th>Peso</th>
+      <th>Total</th><th>Acciones</th>
+    </tr></thead>
+    <tbody>${rows}${totalRow}</tbody>
+  </table>`;
+}
+
+function verG(id) {
+  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const g = guias.find(x => x.id === id);
+  if (!g) return;
+  guiaActual = g;
+  prepPrint(g);
+  document.getElementById('m_id').textContent = g.id;
+  document.getElementById('m_info').innerHTML = `
+    <strong>Remitente:</strong> ${g.rem.n}<br>
+    <strong>Destinatario:</strong> ${g.dst.n}<br>
+    <strong>Ruta:</strong> ${g.ori} → ${g.des} (${g.dst.l})<br>
+    <strong>Peso:</strong> ${g.kg} kg<br>
+    <div style="font-size:18px;font-weight:700;color:var(--orange);margin-top:6px;">TOTAL: ${fmt(g.p?.tot||0)}</div>
+  `;
+  document.getElementById('modal').classList.add('on');
+}
+
+function delG(id) {
+  if (!confirm('¿Eliminar esta guía? No se puede deshacer.')) return;
+  let guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  guias = guias.filter(g => g.id !== id);
+  localStorage.setItem('kg_guias', JSON.stringify(guias));
+  renderMani();
+}
+
+// ═══════════════════════
+// ENVIAR REPORTE
+// ═══════════════════════
+async function sendReport() {
+  const c = getCfg();
+  if (!c.email) {
+    showAlrt('mani', '⚠ Configura el email de destino en la pestaña ⚙️ Config', 'er');
+    return;
+  }
+
+  const fecha  = document.getElementById('fdate').value;
+  const guias  = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const items  = guias.filter(g => g.fecha.startsWith(fecha));
+
+  if (!items.length) {
+    showAlrt('mani', 'No hay guías para enviar en esta fecha.', 'in');
+    return;
+  }
+
+  const totCob = items.reduce((s,g) => s + (g.p?.tot||0), 0);
+  const totKg  = items.reduce((s,g) => s + (g.kg||0), 0);
+  const fDisplay = new Date(fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  const detalle = items.map((g,i) =>
+    `${i+1}. [${g.id}] ${g.rem.n} → ${g.dst.n} | ${g.des} | ${g.kg}kg | ${fmt(g.p?.tot||0)}`
+  ).join('\n');
+
+  const msg = `REPORTE DIARIO — ${c.emp || 'TRANSPORTES KAMKE'}
+Fecha: ${fDisplay}
+
+RESUMEN:
+  • Total guías:         ${items.length}
+  • Kg despachados:      ${totKg.toFixed(1)} kg
+  • Total a cobrar:      ${fmt(totCob)}
+  • Destinos únicos:     ${new Set(items.map(g=>g.des)).size}
+
+DETALLE DE GUÍAS:
+${detalle}
+
+---
+Generado automáticamente por KamkeCargo System`;
+
+  try {
+    emailjs.init(c.ekey || 'eGIGxWgojzInGVVdx');
+    await emailjs.send(
+      c.esvc || 'service_gl216t6',
+      c.etpl || 'template_682vtzc',
+      {
+        to_email: c.email,
+        subject:  `Reporte Guías ${fecha} — ${c.emp || 'TRANSPORTES KAMKE'}`,
+        message:  msg,
+        empresa:  c.emp || 'TRANSPORTES KAMKE',
+        fecha:    fDisplay,
+      }
+    );
+    showAlrt('mani', `✅ Reporte enviado a ${c.email}`, 'ok');
+  } catch(err) {
+    console.error(err);
+    showAlrt('mani', `❌ Error: ${err?.text || err?.message || 'Revisa la configuración de EmailJS'}`, 'er');
+  }
+}
+
+// ═══════════════════════
+// UTILS
+// ═══════════════════════
+function showAlrt(zone, msg, type) {
+  const el = document.getElementById('alrt-' + zone);
+  if (!el) return;
+  el.className = 'alert ' + type;
+  el.textContent = msg;
+  setTimeout(() => el.className = 'alert', 7000);
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('on');
+}
+
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+function resetFg() {
+  document.getElementById('fg').reset();
+  const op = sessionStorage.getItem('kg_op');
+  document.getElementById('atd').value = op || '';
+  document.getElementById('from-calc-badge').classList.remove('show');
+  document.getElementById('gbl').textContent = 'Base de cálculo';
+  document.getElementById('gbv').textContent = '—';
+  document.getElementById('gtot').textContent = '$22.000';
+}
+
+function fmtRut(inp) {
+  let v = inp.value.replace(/[^0-9kK]/g,'');
+  if (v.length > 1) {
+    const dv = v.slice(-1).toUpperCase();
+    const num = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+    v = num + '-' + dv;
+  }
+  inp.value = v;
+}
+
+function expData() {
+  const d = localStorage.getItem('kg_guias') || '[]';
+  const b = new Blob([d], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = `kamke_guias_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+</script>
+</body>
+</html>
