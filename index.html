@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --navy: #14213d;
@@ -973,6 +974,8 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="btn btnG" onclick="sendReport()">📧 Enviar Reporte</button>
+      <button class="btn" style="background:#1d6f42;color:#fff;" onclick="exportarExcelDia()">📊 Excel del Día</button>
+      <button class="btn" style="background:#1d6f42;color:#fff;" onclick="abrirModalExcel()">📊 Excel Personalizado</button>
       <button class="btn btnN" onclick="printMani()">🖨 Imprimir Manifesto</button>
     </div>
   </div>
@@ -1140,6 +1143,45 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
     <div class="gf">
       Guarda esta guía para futuras consultas · El destinatario tiene 5 días hábiles para retirar en la oficina de destino<br>
       <span id="gp_tel_footer"></span>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EXCEL PERSONALIZADO -->
+<div class="overlay" id="modal-excel" style="z-index:250;">
+  <div class="modal">
+    <div style="font-family:var(--cond);font-size:20px;font-weight:900;color:var(--navy);margin-bottom:6px;">📊 Exportar a Excel</div>
+    <p style="font-size:13px;color:var(--g400);margin-bottom:20px;">Selecciona el rango de fechas y el contenido del reporte.</p>
+    <div style="display:grid;gap:14px;">
+      <div class="g2">
+        <div class="f"><label>Desde</label><input type="date" id="xl-desde"></div>
+        <div class="f"><label>Hasta</label><input type="date" id="xl-hasta"></div>
+      </div>
+      <div class="f">
+        <label>Contenido del Reporte</label>
+        <select id="xl-tipo">
+          <option value="detalle">Detalle completo de guías</option>
+          <option value="resumen">Resumen por día</option>
+          <option value="ambos">Ambos (detalle + resumen)</option>
+          <option value="pendientes">Solo facturas pendientes</option>
+        </select>
+      </div>
+      <div class="f">
+        <label>Incluir</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--g800);">
+            <input type="checkbox" id="xl-inc-pagados" checked> Boletas y facturas pagadas
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--g800);">
+            <input type="checkbox" id="xl-inc-pendientes" checked> Facturas por pagar
+          </label>
+        </div>
+      </div>
+    </div>
+    <div id="xl-preview" style="margin-top:14px;padding:10px 14px;background:var(--g50);border-radius:8px;font-size:12.5px;color:var(--g600);display:none;"></div>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button class="btn" style="flex:1;background:#1d6f42;color:#fff;" onclick="generarExcel()">⬇ Descargar Excel</button>
+      <button class="btn btnO" style="flex:1;" onclick="document.getElementById('modal-excel').classList.remove('on')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -2011,6 +2053,219 @@ function fmtRut(inp) {
     v = num + '-' + dv;
   }
   inp.value = v;
+}
+
+// ═══════════════════════
+// EXPORTAR EXCEL
+// ═══════════════════════
+function exportarExcelDia() {
+  const fecha = document.getElementById('fdate').value;
+  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const items = guias.filter(g => g.fecha.startsWith(fecha));
+  if (!items.length) { showAlrt('mani', 'No hay guías para exportar en esta fecha.', 'in'); return; }
+  const wb = crearWorkbook(items, `Guías ${fecha}`, fecha, fecha);
+  XLSX.writeFile(wb, `KamkeCargo_${fecha}.xlsx`);
+}
+
+function abrirModalExcel() {
+  const hoy = new Date().toISOString().slice(0,10);
+  const primerDiaMes = hoy.slice(0,8) + '01';
+  document.getElementById('xl-desde').value = primerDiaMes;
+  document.getElementById('xl-hasta').value = hoy;
+  document.getElementById('xl-tipo').value = 'ambos';
+  document.getElementById('xl-inc-pagados').checked = true;
+  document.getElementById('xl-inc-pendientes').checked = true;
+  actualizarPreviewExcel();
+  document.getElementById('modal-excel').classList.add('on');
+}
+
+function actualizarPreviewExcel() {
+  const desde = document.getElementById('xl-desde').value;
+  const hasta = document.getElementById('xl-hasta').value;
+  if (!desde || !hasta) return;
+  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const items = filtrarGuiasExcel(guias, desde, hasta);
+  const preview = document.getElementById('xl-preview');
+  preview.style.display = 'block';
+  preview.innerHTML = `Se exportarán <strong>${items.length} guías</strong> del ${desde} al ${hasta} · Total: <strong>${fmt(items.reduce((s,g)=>s+(g.p?.tot||0),0))}</strong>`;
+}
+
+// Listen for date changes
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'xl-desde' || e.target.id === 'xl-hasta') actualizarPreviewExcel();
+});
+
+function filtrarGuiasExcel(guias, desde, hasta) {
+  const incPag  = document.getElementById('xl-inc-pagados')?.checked !== false;
+  const incPend = document.getElementById('xl-inc-pendientes')?.checked !== false;
+  return guias.filter(g => {
+    const fecha = g.fecha.slice(0,10);
+    if (fecha < desde || fecha > hasta) return false;
+    if (!incPend && g.estado_pago === 'POR PAGAR') return false;
+    if (!incPag  && g.estado_pago !== 'POR PAGAR') return false;
+    return true;
+  });
+}
+
+function generarExcel() {
+  const desde = document.getElementById('xl-desde').value;
+  const hasta = document.getElementById('xl-hasta').value;
+  const tipo  = document.getElementById('xl-tipo').value;
+  if (!desde || !hasta) { alert('Selecciona el rango de fechas.'); return; }
+
+  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const items = filtrarGuiasExcel(guias, desde, hasta);
+  if (!items.length) { alert('No hay guías en el rango seleccionado.'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const nombreArchivo = `KamkeCargo_${desde}_${hasta}`;
+
+  if (tipo === 'detalle' || tipo === 'ambos') {
+    const wsDetalle = crearHojaDetalle(items);
+    XLSX.utils.book_append_sheet(wb, wsDetalle, 'Detalle Guías');
+  }
+  if (tipo === 'resumen' || tipo === 'ambos') {
+    const wsResumen = crearHojaResumen(items, desde, hasta);
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen por Día');
+  }
+  if (tipo === 'pendientes') {
+    const pend = items.filter(g => g.estado_pago === 'POR PAGAR');
+    const wsPend = crearHojaDetalle(pend, true);
+    XLSX.utils.book_append_sheet(wb, wsPend, 'Facturas Pendientes');
+  }
+
+  XLSX.writeFile(wb, `${nombreArchivo}.xlsx`);
+  document.getElementById('modal-excel').classList.remove('on');
+  showAlrt('mani', `✅ Excel descargado: ${items.length} guías exportadas.`, 'ok');
+}
+
+function crearWorkbook(items, titulo, desde, hasta) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, crearHojaDetalle(items), 'Detalle Guías');
+  XLSX.utils.book_append_sheet(wb, crearHojaResumen(items, desde, hasta), 'Resumen por Día');
+  return wb;
+}
+
+function crearHojaDetalle(items, esPendientes = false) {
+  const cfg = getCfg();
+
+  const headers = [
+    'N° Guía', 'Fecha', 'Hora', 'Origen', 'Destino',
+    'Remitente', 'RUT Remitente', 'Dir. Remitente', 'Tel. Remitente',
+    'Destinatario', 'RUT Destinatario', 'Dir. Destinatario', 'Tel. Destinatario', 'Localidad',
+    'Contenido', 'Peso Kg', 'Volumen m³', 'Dimensiones',
+    'Valor Declarado', 'Tipo Documento', 'Estado Pago', 'Total a Cobrar',
+    'Atendido Por'
+  ];
+
+  const rows = items.map(g => {
+    const fch = new Date(g.fecha);
+    return [
+      g.id,
+      fch.toLocaleDateString('es-CL'),
+      fch.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'}),
+      g.ori, g.des,
+      g.rem.n, g.rem.r, g.rem.d, g.rem.t,
+      g.dst.n, g.dst.r, g.dst.d, g.dst.t, g.dst.l,
+      g.cnt,
+      g.kg,
+      +(g.p?.vm||0).toFixed(4),
+      (g.l && g.a && g.h) ? `${g.l}×${g.a}×${g.h} cm` : '—',
+      g.vd || 0,
+      g.tipo_doc || 'BOLETA',
+      g.estado_pago || 'PAGADO',
+      g.p?.tot || 0,
+      g.atd
+    ];
+  });
+
+  // Add totals row
+  const totalPeso = items.reduce((s,g) => s+(g.kg||0), 0);
+  const totalCobrar = items.reduce((s,g) => s+(g.p?.tot||0), 0);
+  const totals = ['', '', '', '', 'TOTAL', '', '', '', '', '', '', '', '', '',
+    '', totalPeso, '', '', '', '', '', totalCobrar, ''];
+
+  const data = [
+    [`REPORTE ${esPendientes ? 'FACTURAS PENDIENTES' : 'DETALLE DE GUÍAS'} — ${cfg.emp || 'TRANSPORTES KAMKE'}`],
+    [`Generado: ${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})}`],
+    [],
+    headers,
+    ...rows,
+    [],
+    totals
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:18},{wch:11},{wch:7},{wch:14},{wch:16},
+    {wch:22},{wch:14},{wch:20},{wch:14},
+    {wch:22},{wch:14},{wch:20},{wch:14},{wch:16},
+    {wch:18},{wch:9},{wch:11},{wch:16},
+    {wch:14},{wch:12},{wch:12},{wch:14},
+    {wch:18}
+  ];
+
+  return ws;
+}
+
+function crearHojaResumen(items, desde, hasta) {
+  const cfg = getCfg();
+
+  // Group by date
+  const porFecha = {};
+  items.forEach(g => {
+    const fecha = g.fecha.slice(0,10);
+    if (!porFecha[fecha]) porFecha[fecha] = [];
+    porFecha[fecha].push(g);
+  });
+
+  const headers = ['Fecha', 'N° Guías', 'Kg Total', 'Boletas', 'Facturas Pagadas', 'Facturas Pendientes', 'Total Cobrado', 'Monto Pendiente', 'Total General'];
+
+  const rows = Object.keys(porFecha).sort().map(fecha => {
+    const gs = porFecha[fecha];
+    const boletas   = gs.filter(g => g.tipo_doc !== 'FACTURA').length;
+    const factPag   = gs.filter(g => g.tipo_doc === 'FACTURA' && g.estado_pago === 'PAGADO').length;
+    const factPend  = gs.filter(g => g.estado_pago === 'POR PAGAR').length;
+    const totKg     = gs.reduce((s,g) => s+(g.kg||0), 0);
+    const totCob    = gs.filter(g=>g.estado_pago!=='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
+    const totPend   = gs.filter(g=>g.estado_pago==='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
+    const totGen    = gs.reduce((s,g)=>s+(g.p?.tot||0),0);
+    return [
+      new Date(fecha+'T12:00:00').toLocaleDateString('es-CL'),
+      gs.length, +totKg.toFixed(1),
+      boletas, factPag, factPend,
+      totCob, totPend, totGen
+    ];
+  });
+
+  // Grand totals
+  const gtKg    = items.reduce((s,g)=>s+(g.kg||0),0);
+  const gtCob   = items.filter(g=>g.estado_pago!=='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
+  const gtPend  = items.filter(g=>g.estado_pago==='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
+  const gtGen   = items.reduce((s,g)=>s+(g.p?.tot||0),0);
+  const totRow  = ['TOTAL', items.length, +gtKg.toFixed(1),
+    items.filter(g=>g.tipo_doc!=='FACTURA').length,
+    items.filter(g=>g.tipo_doc==='FACTURA'&&g.estado_pago==='PAGADO').length,
+    items.filter(g=>g.estado_pago==='POR PAGAR').length,
+    gtCob, gtPend, gtGen];
+
+  const data = [
+    [`RESUMEN POR DÍA — ${cfg.emp || 'TRANSPORTES KAMKE'}`],
+    [`Período: ${desde} al ${hasta}  |  Generado: ${new Date().toLocaleDateString('es-CL')}`],
+    [],
+    headers,
+    ...rows,
+    [],
+    totRow
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [
+    {wch:13},{wch:10},{wch:10},{wch:10},{wch:16},{wch:18},{wch:16},{wch:16},{wch:14}
+  ];
+  return ws;
 }
 
 function expData() {
