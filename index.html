@@ -408,106 +408,151 @@ tbody tr:hover td { background:var(--g50); }
 #pw { display:none; }
 
 #gp {
-  font-family:'Courier New', monospace;
-  font-size:11.5px;
+  font-family:Arial, sans-serif;
+  font-size:10px;
   color:#000;
   background:#fff;
-  width:390px;
-  padding:20px;
-  border:2.5px solid #000;
-  margin:16px auto;
+  width:148mm;
+  padding:6mm;
+  box-sizing:border-box;
 }
 #gp .gh {
   text-align:center;
-  border-bottom:3px double #000;
-  padding-bottom:12px;
-  margin-bottom:12px;
+  border-bottom:2px solid #000;
+  padding-bottom:5px;
+  margin-bottom:6px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
 }
+#gp .gh-left { text-align:left; }
 #gp .gh .gempresa {
-  font-size:19px;
+  font-size:15px;
   font-weight:900;
-  letter-spacing:3px;
+  letter-spacing:2px;
   font-family:Arial, sans-serif;
   text-transform:uppercase;
 }
 #gp .gh .gsubtitle {
-  font-size:11px;
+  font-size:9px;
   font-weight:700;
-  letter-spacing:2px;
-  margin-top:3px;
+  letter-spacing:1px;
+  margin-top:2px;
   font-family:Arial, sans-serif;
+  color:#444;
 }
 #gp .gh .gnum {
   display:inline-block;
-  margin-top:10px;
   background:#000;
   color:#fff;
-  padding:4px 14px;
-  font-size:15px;
+  padding:4px 10px;
+  font-size:12px;
   font-weight:700;
   letter-spacing:1px;
+  white-space:nowrap;
 }
+
+/* TWO COLUMN ROW */
+#gp .grow2 {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+  margin-bottom:5px;
+}
+
 #gp .gs {
   border:1px solid #bbb;
-  border-radius:3px;
-  padding:9px 10px;
-  margin-bottom:9px;
+  border-radius:2px;
+  padding:5px 7px;
+  margin-bottom:5px;
 }
+#gp .gs.no-mb { margin-bottom:0; }
 #gp .gst {
   font-family:Arial,sans-serif;
-  font-size:9.5px;
+  font-size:8.5px;
   font-weight:700;
   text-transform:uppercase;
-  letter-spacing:1px;
+  letter-spacing:.8px;
   color:#555;
   border-bottom:1px solid #ddd;
-  padding-bottom:5px;
-  margin-bottom:7px;
+  padding-bottom:3px;
+  margin-bottom:4px;
 }
-#gp .gr { display:flex; margin-bottom:5px; line-height:1.4; }
+#gp .gr { display:flex; margin-bottom:3px; line-height:1.3; }
 #gp .gk {
   font-family:Arial,sans-serif;
-  font-size:9.5px;
+  font-size:8.5px;
   font-weight:700;
   text-transform:uppercase;
-  letter-spacing:.4px;
-  min-width:130px;
+  letter-spacing:.3px;
+  min-width:80px;
   color:#333;
   flex-shrink:0;
 }
 #gp .gv {
   font-family:Arial,sans-serif;
-  font-size:11px;
+  font-size:9.5px;
   font-weight:700;
 }
+
+/* ENVÍO INFO - compact grid */
+#gp .genv {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0 10px;
+}
+
 #gp .ph {
   background:#000;
   color:#fff;
-  padding:8px 12px;
+  padding:5px 10px;
   text-align:center;
-  margin:10px 0;
-  border-radius:3px;
+  margin:5px 0;
+  border-radius:2px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
 }
-#gp .ph .plb { font-family:Arial,sans-serif; font-size:9.5px; letter-spacing:1.5px; text-transform:uppercase; opacity:.75; }
-#gp .ph .pv { font-size:26px; font-weight:900; letter-spacing:1px; }
-#gp .ba { text-align:center; margin-top:14px; padding-top:10px; border-top:1px dashed #bbb; }
+#gp .ph .plb { font-family:Arial,sans-serif; font-size:9px; letter-spacing:1px; text-transform:uppercase; opacity:.75; }
+#gp .ph .pv { font-size:22px; font-weight:900; letter-spacing:1px; }
+#gp .ph .pdoc { font-size:10px; font-weight:700; opacity:.85; background:rgba(255,255,255,.15); padding:3px 8px; border-radius:2px; }
+
+#gp .ba { text-align:center; margin-top:5px; padding-top:5px; border-top:1px dashed #bbb; }
 #gp .gf {
   text-align:center;
   font-family:Arial,sans-serif;
-  font-size:9px;
+  font-size:8px;
   color:#666;
-  margin-top:10px;
-  padding-top:8px;
+  margin-top:5px;
+  padding-top:5px;
   border-top:1px solid #ccc;
-  line-height:1.6;
+  line-height:1.5;
 }
+#gp .gmeta {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:4px;
+  margin-bottom:5px;
+  background:#f5f5f5;
+  border-radius:2px;
+  padding:4px 7px;
+}
+#gp .gmeta .gk { min-width:0; }
 
 /* PRINT STYLES */
 @media print {
   body > *:not(#pw) { display:none !important; }
   #pw { display:block !important; }
-  #gp { border:none; width:100%; padding:0; }
-  @page { size:A5 portrait; margin:8mm; }
+  #gp { border:none; width:100%; padding:4mm; }
+  @page {
+    size: A5 portrait;
+    margin: 0;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
 
 /* CONFIG */
@@ -984,61 +1029,58 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
 <div id="pw">
   <div id="gp">
     <div class="gh">
-      <div class="gempresa" id="gp_emp">TRANSPORTES KAMKE</div>
-      <div class="gsubtitle">GUÍA DE DESPACHO NACIONAL</div>
+      <div class="gh-left">
+        <div class="gempresa" id="gp_emp">TRANSPORTES KAMKE</div>
+        <div class="gsubtitle">GUÍA DE DESPACHO NACIONAL</div>
+      </div>
       <div class="gnum" id="gp_num">KMK-00000000-0000</div>
     </div>
-
-    <div class="gs">
-      <div class="gst">📤 REMITENTE</div>
-      <div class="gr"><span class="gk">NOMBRE:</span><span class="gv" id="gp_rn"></span></div>
-      <div class="gr"><span class="gk">RUT:</span><span class="gv" id="gp_rr"></span></div>
-      <div class="gr"><span class="gk">DIRECCIÓN:</span><span class="gv" id="gp_rd"></span></div>
-      <div class="gr"><span class="gk">TELÉFONO:</span><span class="gv" id="gp_rt"></span></div>
+    <div class="grow2">
+      <div class="gs no-mb">
+        <div class="gst">📤 REMITENTE</div>
+        <div class="gr"><span class="gk">NOMBRE:</span><span class="gv" id="gp_rn"></span></div>
+        <div class="gr"><span class="gk">RUT:</span><span class="gv" id="gp_rr"></span></div>
+        <div class="gr"><span class="gk">DIRECCIÓN:</span><span class="gv" id="gp_rd"></span></div>
+        <div class="gr"><span class="gk">TELÉFONO:</span><span class="gv" id="gp_rt"></span></div>
+      </div>
+      <div class="gs no-mb">
+        <div class="gst">📥 DESTINATARIO</div>
+        <div class="gr"><span class="gk">NOMBRE:</span><span class="gv" id="gp_dn"></span></div>
+        <div class="gr"><span class="gk">RUT:</span><span class="gv" id="gp_dr"></span></div>
+        <div class="gr"><span class="gk">DIRECCIÓN:</span><span class="gv" id="gp_dd"></span></div>
+        <div class="gr"><span class="gk">TELÉFONO:</span><span class="gv" id="gp_dt"></span></div>
+        <div class="gr"><span class="gk">LOCALIDAD:</span><span class="gv" id="gp_dl"></span></div>
+      </div>
     </div>
-
-    <div class="gs">
-      <div class="gst">📥 DESTINATARIO</div>
-      <div class="gr"><span class="gk">NOMBRE:</span><span class="gv" id="gp_dn"></span></div>
-      <div class="gr"><span class="gk">RUT:</span><span class="gv" id="gp_dr"></span></div>
-      <div class="gr"><span class="gk">DIRECCIÓN:</span><span class="gv" id="gp_dd"></span></div>
-      <div class="gr"><span class="gk">TELÉFONO:</span><span class="gv" id="gp_dt"></span></div>
-      <div class="gr"><span class="gk">LOCALIDAD:</span><span class="gv" id="gp_dl"></span></div>
+    <div class="gs" style="margin-top:5px;">
+      <div class="gst">🚚 DATOS DEL ENVÍO</div>
+      <div class="genv">
+        <div class="gr"><span class="gk">ORIGEN:</span><span class="gv" id="gp_ori"></span></div>
+        <div class="gr"><span class="gk">DESTINO:</span><span class="gv" id="gp_dst"></span></div>
+        <div class="gr"><span class="gk">CONTENIDO:</span><span class="gv" id="gp_cnt"></span></div>
+        <div class="gr"><span class="gk">SERVICIO:</span><span class="gv" id="gp_svc"></span></div>
+        <div class="gr"><span class="gk">PESO FÍSICO:</span><span class="gv" id="gp_kk"></span></div>
+        <div class="gr"><span class="gk">PESO VOL.:</span><span class="gv" id="gp_vm"></span></div>
+        <div class="gr"><span class="gk">DIMENSIONES:</span><span class="gv" id="gp_dim"></span></div>
+        <div class="gr"><span class="gk">VAL. DECLARADO:</span><span class="gv" id="gp_vd"></span></div>
+      </div>
+      <div id="gp_obs_row" class="gr" style="display:none;margin-top:3px;"><span class="gk">OBS.:</span><span class="gv" id="gp_obs"></span></div>
     </div>
-
-    <div class="gs">
-      <div class="gst">🚚 INFORMACIÓN DEL ENVÍO</div>
-      <div class="gr"><span class="gk">ORIGEN:</span><span class="gv" id="gp_ori"></span></div>
-      <div class="gr"><span class="gk">DESTINO:</span><span class="gv" id="gp_dst"></span></div>
-      <div class="gr"><span class="gk">SERVICIO:</span><span class="gv" id="gp_svc"></span></div>
-      <div class="gr"><span class="gk">CONTENIDO:</span><span class="gv" id="gp_cnt"></span></div>
-      <div class="gr"><span class="gk">PESO FÍSICO:</span><span class="gv" id="gp_kk"></span></div>
-      <div class="gr"><span class="gk">PESO VOLUMÉTRICO:</span><span class="gv" id="gp_vm"></span></div>
-      <div class="gr"><span class="gk">DIMENSIONES:</span><span class="gv" id="gp_dim"></span></div>
-      <div class="gr"><span class="gk">VALOR DECLARADO:</span><span class="gv" id="gp_vd"></span></div>
-      <div id="gp_obs_row" class="gr"><span class="gk">OBSERVACIONES:</span><span class="gv" id="gp_obs"></span></div>
-    </div>
-
     <div class="ph">
-      <div class="plb">VALOR A COBRAR</div>
-      <div class="pv" id="gp_prc">$0</div>
+      <div><div class="plb">VALOR A COBRAR</div><div class="pv" id="gp_prc">$0</div></div>
+      <div class="pdoc" id="gp_doc_badge">BOLETA</div>
     </div>
-
-    <div class="gs" style="margin-bottom:0;">
-      <div class="gr"><span class="gk">FECHA ADMISIÓN:</span><span class="gv" id="gp_fch"></span></div>
-      <div class="gr"><span class="gk">OFICINA ORIGEN:</span><span class="gv" id="gp_ofi"></span></div>
-      <div class="gr"><span class="gk">ATENDIDO POR:</span><span class="gv" id="gp_atd"></span></div>
-      <div class="gr"><span class="gk">NRO. OPERACIÓN:</span><span class="gv" id="gp_nop"></span></div>
+    <div class="gmeta">
+      <div class="gr"><span class="gk">FECHA:</span><span class="gv" id="gp_fch"></span></div>
+      <div class="gr"><span class="gk">OPERADOR:</span><span class="gv" id="gp_atd"></span></div>
+      <div class="gr"><span class="gk">N° OP.:</span><span class="gv" id="gp_nop"></span></div>
     </div>
-
     <div class="ba">
       <svg id="gp_bc"></svg>
-      <div style="font-size:11px;margin-top:3px;letter-spacing:1px;" id="gp_bcn"></div>
+      <div style="font-size:9px;margin-top:2px;letter-spacing:1px;" id="gp_bcn"></div>
     </div>
-
     <div class="gf">
-      Guarda esta guía para futuras consultas asociadas a tu envío.<br>
-      El destinatario tiene 5 días hábiles para retirar en la oficina de destino.<br>
+      Guarda esta guía para futuras consultas · El destinatario tiene 5 días hábiles para retirar en la oficina de destino<br>
       <span id="gp_tel_footer"></span>
     </div>
   </div>
@@ -1403,7 +1445,7 @@ function prepPrint(g) {
   set('gp_dn',  g.dst.n); set('gp_dr', g.dst.r); set('gp_dd', g.dst.d); set('gp_dt', g.dst.t); set('gp_dl', g.dst.l);
   set('gp_ori', g.ori);
   set('gp_dst', g.des);
-  set('gp_svc', g.svc);
+  set('gp_svc', g.svc || 'ESTÁNDAR');
   set('gp_cnt', g.cnt);
   set('gp_kk',  g.kg + ' kg');
   set('gp_vm',  g.p.vm.toFixed(4) + ' m³');
@@ -1411,10 +1453,16 @@ function prepPrint(g) {
   set('gp_vd',  g.vd ? fmt(g.vd) : '—');
   set('gp_prc', fmt(g.p.tot));
   set('gp_fch', fstr);
-  set('gp_ofi', (c.emp || 'TRANSPORTES KAMKE') + ' · ' + g.ori);
   set('gp_atd', g.atd);
   set('gp_nop', g.nop);
   set('gp_tel_footer', c.tel ? 'Contacto: ' + c.tel : '');
+
+  // Doc badge
+  const docBadge = document.getElementById('gp_doc_badge');
+  if (docBadge) {
+    docBadge.textContent = g.tipo_doc || 'BOLETA';
+    docBadge.style.background = g.estado_pago === 'POR PAGAR' ? '#f59e0b' : 'rgba(255,255,255,.15)';
+  }
 
   const obsRow = document.getElementById('gp_obs_row');
   if (g.obs) {
