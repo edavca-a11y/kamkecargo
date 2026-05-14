@@ -685,6 +685,44 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
 .scard.danger { border-left-color:var(--red); }
 .scard.warning { border-left-color:#f59e0b; }
 .scard.success { border-left-color:var(--green); }
+
+/* USER MANAGEMENT */
+.role-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.8px; padding:3px 8px; border-radius:4px;
+}
+.role-admin { background:#fef3c7; color:#92400e; }
+.role-operador { background:#eff6ff; color:#1d4ed8; }
+.status-activo { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--green); }
+.status-inactivo { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--red); }
+
+/* HEADER ROLE PILL */
+.op-role { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  background:rgba(255,255,255,.15); padding:1px 6px; border-radius:3px; margin-left:4px; }
+
+/* USER CARDS in login */
+.user-cards { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.user-card {
+  border:2px solid rgba(255,255,255,.15); border-radius:8px; padding:12px;
+  cursor:pointer; transition:.15s; text-align:center; background:rgba(255,255,255,.05);
+}
+.user-card:hover { border-color:var(--orange); background:rgba(232,93,4,.1); }
+.user-card.selected { border-color:var(--orange); background:rgba(232,93,4,.15); }
+.user-card .uc-name { font-family:var(--cond); font-size:15px; font-weight:700; color:#fff; margin-bottom:3px; }
+.user-card .uc-role { font-size:10px; font-weight:600; color:rgba(255,255,255,.5); text-transform:uppercase; }
+
+/* PIN INPUT */
+.pin-wrap { display:flex; gap:8px; justify-content:center; margin:12px 0; }
+.pin-digit {
+  width:48px; height:56px; border:2px solid rgba(255,255,255,.2); border-radius:8px;
+  text-align:center; font-family:var(--mono); font-size:22px; font-weight:700;
+  color:#fff; background:rgba(255,255,255,.08); outline:none; transition:.15s;
+  -webkit-text-security:disc;
+}
+.pin-digit:focus { border-color:var(--orange); background:rgba(232,93,4,.1); }
+.pin-error { color:#fca5a5; font-size:12px; text-align:center; margin-top:6px; display:none; }
+.pin-error.show { display:block; }
 </style>
 </head>
 <body>
@@ -703,11 +741,13 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
     <button class="nbtn on" onclick="showTab('calc',this)">🧮 Calculadora</button>
     <button class="nbtn" onclick="showTab('guia',this)">📦 Nueva Guía</button>
     <button class="nbtn" onclick="showTab('mani',this)">📋 Manifesto</button>
+    <button class="nbtn" id="btn-usuarios" style="display:none;" onclick="showTab('usuarios',this)">👥 Usuarios</button>
     <button class="nbtn" onclick="showTab('cfg',this)">⚙️ Config</button>
   </nav>
-  <div class="op-pill" onclick="changeOperator()" title="Click para cambiar operador">
+  <div class="op-pill" onclick="changeOperator()" title="Click para cambiar sesión">
     <span class="op-dot"></span>
     <span id="hdr-op">—</span>
+    <span class="op-role" id="hdr-role"></span>
   </div>
 </header>
 
@@ -1009,6 +1049,24 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
 
 </div><!-- /wrap -->
 
+<!-- ═══ USUARIOS ═══ (inserted before wrap close above) -->
+<div class="wrap" style="max-width:1020px;margin:0 auto;padding:0 20px 28px;">
+<div id="tab-usuarios" class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+    <span style="font-family:var(--cond);font-size:20px;font-weight:800;color:var(--navy);">👥 MANTENEDOR DE USUARIOS</span>
+    <button class="btn btnP" onclick="abrirModalUsuario()">+ Nuevo Usuario</button>
+  </div>
+  <div id="alrt-usuarios" class="alert"></div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div id="usuarios-tbl"></div>
+  </div>
+  <div style="margin-top:14px;padding:12px 16px;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:8px;font-size:12.5px;color:#92400e;">
+    🔐 <strong>Seguridad:</strong> Los PINs se almacenan localmente en este navegador. Asegúrate de que el computador de trabajo tenga acceso restringido.
+    El PIN predeterminado del administrador es <strong>1234</strong> — cámbialo a la brevedad.
+  </div>
+</div>
+</div>
+
 <!-- MODAL GUÍA GENERADA -->
 <div class="overlay" id="modal">
   <div class="modal">
@@ -1089,17 +1147,72 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
 <!-- LOGIN MODAL -->
 <div class="overlay" id="modal-login" style="z-index:300;">
   <div class="login-modal">
-    <div style="font-size:40px;margin-bottom:12px;">👤</div>
-    <h2>¿Quién está operando?</h2>
-    <p>Selecciona tu nombre para continuar.<br>Quedará registrado en cada guía que generes.</p>
-    <select id="login-select">
-      <option value="">— Seleccionar operador —</option>
-    </select>
-    <div style="font-size:12px;color:rgba(255,255,255,.4);margin:-4px 0 10px;">¿No estás en la lista? Ingresa tu nombre:</div>
-    <input type="text" id="login-input" placeholder="Tu nombre completo..." oninput="syncLoginInput()">
-    <button class="btn btnP" style="width:100%;justify-content:center;font-size:16px;padding:13px;" onclick="doLogin()">
-      Ingresar al Sistema →
-    </button>
+    <div style="font-size:36px;margin-bottom:10px;">🚛</div>
+    <h2>KAMKE<span style="color:var(--orange);">CARGO</span></h2>
+    <p id="login-subtitle">Selecciona tu usuario para continuar</p>
+
+    <!-- STEP 1: Seleccionar usuario -->
+    <div id="login-step1">
+      <div class="user-cards" id="login-user-cards"></div>
+      <div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;margin-bottom:8px;">
+        Si no apareces en la lista, contacta al administrador.
+      </div>
+    </div>
+
+    <!-- STEP 2: Ingresar PIN -->
+    <div id="login-step2" style="display:none;">
+      <div style="font-family:var(--cond);font-size:18px;font-weight:700;color:#fff;margin-bottom:4px;" id="login-username-display">—</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px;">Ingresa tu PIN de 4 dígitos</div>
+      <div class="pin-wrap">
+        <input class="pin-digit" id="p0" type="password" inputmode="numeric" maxlength="1" oninput="pinNext(0)" onkeydown="pinKey(event,0)">
+        <input class="pin-digit" id="p1" type="password" inputmode="numeric" maxlength="1" oninput="pinNext(1)" onkeydown="pinKey(event,1)">
+        <input class="pin-digit" id="p2" type="password" inputmode="numeric" maxlength="1" oninput="pinNext(2)" onkeydown="pinKey(event,2)">
+        <input class="pin-digit" id="p3" type="password" inputmode="numeric" maxlength="1" oninput="pinNext(3)" onkeydown="pinKey(event,3)">
+      </div>
+      <div class="pin-error" id="pin-error">PIN incorrecto. Intenta de nuevo.</div>
+      <button class="btn btnP" style="width:100%;justify-content:center;margin-top:10px;" onclick="verificarPin()">
+        Ingresar →
+      </button>
+      <button style="background:none;border:none;color:rgba(255,255,255,.4);font-size:12px;cursor:pointer;margin-top:8px;width:100%;" onclick="volverStep1()">
+        ← Cambiar usuario
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO/EDITAR USUARIO -->
+<div class="overlay" id="modal-usuario" style="z-index:250;">
+  <div class="modal">
+    <div style="font-family:var(--cond);font-size:20px;font-weight:900;color:var(--navy);margin-bottom:18px;" id="mu-title">Nuevo Usuario</div>
+    <div style="display:grid;gap:14px;">
+      <div class="f"><label>Nombre Completo <span class="req">*</span></label>
+        <input id="mu-nombre" placeholder="Juan Pérez"></div>
+      <div class="f"><label>Rol <span class="req">*</span></label>
+        <select id="mu-rol">
+          <option value="operador">Operador</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <div class="f"><label>PIN (4 dígitos) <span class="req">*</span></label>
+        <div class="pin-wrap" style="justify-content:flex-start;">
+          <input class="pin-digit" id="mu-p0" type="password" inputmode="numeric" maxlength="1" oninput="muPinNext(0)" style="background:#f7f8fc;color:var(--navy);border-color:var(--g200);">
+          <input class="pin-digit" id="mu-p1" type="password" inputmode="numeric" maxlength="1" oninput="muPinNext(1)" style="background:#f7f8fc;color:var(--navy);border-color:var(--g200);">
+          <input class="pin-digit" id="mu-p2" type="password" inputmode="numeric" maxlength="1" oninput="muPinNext(2)" style="background:#f7f8fc;color:var(--navy);border-color:var(--g200);">
+          <input class="pin-digit" id="mu-p3" type="password" inputmode="numeric" maxlength="1" oninput="muPinNext(3)" style="background:#f7f8fc;color:var(--navy);border-color:var(--g200);">
+        </div>
+      </div>
+      <div class="f"><label>Estado</label>
+        <select id="mu-activo">
+          <option value="1">Activo</option>
+          <option value="0">Inactivo</option>
+        </select>
+      </div>
+    </div>
+    <input type="hidden" id="mu-id">
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button class="btn btnP" style="flex:1;" onclick="guardarUsuario()">💾 Guardar</button>
+      <button class="btn btnO" style="flex:1;" onclick="document.getElementById('modal-usuario').classList.remove('on')">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -1115,64 +1228,255 @@ const TARIFA_M3   = 92820;
 // INIT
 // ═══════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  initUsers();
   loadCfg();
   const hoy = new Date().toISOString().slice(0,10);
   document.getElementById('fdate').value = hoy;
   renderMani();
-  // Check if operator is set for this session
-  const op = sessionStorage.getItem('kg_op');
-  if (op) {
-    setOperator(op);
+  const session = getSession();
+  if (session) {
+    const users = getUsers();
+    const user = users.find(u => u.id === session.id && u.activo);
+    if (user) { setSession(user); }
+    else { showLoginModal(); }
   } else {
     showLoginModal();
   }
 });
 
 // ═══════════════════════
-// OPERATOR SESSION
+// GESTIÓN DE USUARIOS
 // ═══════════════════════
-function showLoginModal() {
-  const c = getCfg();
-  const sel = document.getElementById('login-select');
-  // Clear and repopulate
-  sel.innerHTML = '<option value="">— Seleccionar operador —</option>';
-  if (c.ops) {
-    c.ops.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name; opt.textContent = name;
-      sel.appendChild(opt);
-    });
+function getUsers() {
+  return JSON.parse(localStorage.getItem('kg_users') || '[]');
+}
+function saveUsers(users) {
+  localStorage.setItem('kg_users', JSON.stringify(users));
+}
+function initUsers() {
+  if (!localStorage.getItem('kg_users')) {
+    saveUsers([{
+      id: 'u_admin',
+      nombre: 'Administrador',
+      pin: '1234',
+      rol: 'admin',
+      activo: true,
+      created: new Date().toISOString()
+    }]);
   }
+}
+function getSession() {
+  const s = sessionStorage.getItem('kg_session');
+  return s ? JSON.parse(s) : null;
+}
+function isAdmin() {
+  const s = getSession();
+  return s && s.rol === 'admin';
+}
+
+// ═══════════════════════
+// LOGIN FLOW
+// ═══════════════════════
+let loginSelectedUser = null;
+
+function showLoginModal() {
+  loginSelectedUser = null;
+  document.getElementById('login-step1').style.display = 'block';
+  document.getElementById('login-step2').style.display = 'none';
+  document.getElementById('login-subtitle').textContent = 'Selecciona tu usuario para continuar';
+  renderLoginCards();
   document.getElementById('modal-login').classList.add('on');
 }
 
-function syncLoginInput() {
-  // When typing manually, clear the select
-  const inp = document.getElementById('login-input').value;
-  if (inp) document.getElementById('login-select').value = '';
+function renderLoginCards() {
+  const users = getUsers().filter(u => u.activo);
+  const container = document.getElementById('login-user-cards');
+  if (!users.length) {
+    container.innerHTML = `<div style="grid-column:span 2;color:rgba(255,255,255,.5);text-align:center;padding:20px;">
+      No hay usuarios activos. Contacta al administrador.
+    </div>`;
+    return;
+  }
+  container.innerHTML = users.map(u => `
+    <div class="user-card" onclick="selectUser('${u.id}')">
+      <div class="uc-name">${u.nombre}</div>
+      <div class="uc-role">${u.rol === 'admin' ? '👑 Admin' : '👤 Operador'}</div>
+    </div>
+  `).join('');
 }
 
-function doLogin() {
-  const sel = document.getElementById('login-select').value;
-  const inp = document.getElementById('login-input').value.trim();
-  const name = sel || inp;
-  if (!name) { alert('Por favor selecciona o ingresa tu nombre.'); return; }
-  setOperator(name);
-  document.getElementById('modal-login').classList.remove('on');
+function selectUser(id) {
+  const users = getUsers();
+  loginSelectedUser = users.find(u => u.id === id);
+  if (!loginSelectedUser) return;
+  // Show PIN step
+  document.getElementById('login-step1').style.display = 'none';
+  document.getElementById('login-step2').style.display = 'block';
+  document.getElementById('login-subtitle').textContent = '¡Hola! Ingresa tu PIN';
+  document.getElementById('login-username-display').textContent = loginSelectedUser.nombre;
+  // Clear PIN inputs
+  ['p0','p1','p2','p3'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pin-error').classList.remove('show');
+  setTimeout(() => document.getElementById('p0').focus(), 100);
 }
 
-function setOperator(name) {
-  sessionStorage.setItem('kg_op', name);
-  document.getElementById('hdr-op').textContent = name;
+function pinNext(idx) {
+  const val = document.getElementById('p' + idx).value;
+  if (val && idx < 3) document.getElementById('p' + (idx+1)).focus();
+  if (idx === 3 && val) verificarPin();
+}
+
+function pinKey(e, idx) {
+  if (e.key === 'Backspace' && !document.getElementById('p' + idx).value && idx > 0) {
+    document.getElementById('p' + (idx-1)).focus();
+  }
+}
+
+function verificarPin() {
+  if (!loginSelectedUser) return;
+  const pin = ['p0','p1','p2','p3'].map(id => document.getElementById(id).value).join('');
+  if (pin === loginSelectedUser.pin) {
+    setSession(loginSelectedUser);
+    document.getElementById('modal-login').classList.remove('on');
+  } else {
+    document.getElementById('pin-error').classList.add('show');
+    ['p0','p1','p2','p3'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('p0').focus();
+  }
+}
+
+function volverStep1() {
+  loginSelectedUser = null;
+  document.getElementById('login-step1').style.display = 'block';
+  document.getElementById('login-step2').style.display = 'none';
+  document.getElementById('login-subtitle').textContent = 'Selecciona tu usuario para continuar';
+}
+
+function setSession(user) {
+  const session = { id: user.id, nombre: user.nombre, rol: user.rol };
+  sessionStorage.setItem('kg_session', JSON.stringify(session));
+  document.getElementById('hdr-op').textContent = user.nombre;
+  document.getElementById('hdr-role').textContent = user.rol === 'admin' ? 'admin' : '';
+  // Show/hide admin tab
+  document.getElementById('btn-usuarios').style.display = user.rol === 'admin' ? 'inline-flex' : 'none';
   const atd = document.getElementById('atd');
-  if (atd) atd.value = name;
+  if (atd) atd.value = user.nombre;
 }
 
 function changeOperator() {
-  // Reset inputs and show modal
-  document.getElementById('login-input').value = '';
-  document.getElementById('login-select').value = '';
   showLoginModal();
+}
+
+// ═══════════════════════
+// RENDER USUARIOS TAB
+// ═══════════════════════
+function renderUsuarios() {
+  const users = getUsers();
+  const tbl = document.getElementById('usuarios-tbl');
+  if (!tbl) return;
+  const rows = users.map(u => `
+    <tr>
+      <td style="font-weight:700;color:var(--navy);">${u.nombre}</td>
+      <td><span class="role-badge ${u.rol === 'admin' ? 'role-admin' : 'role-operador'}">${u.rol === 'admin' ? '👑 Admin' : '👤 Operador'}</span></td>
+      <td>${u.activo ? '<span class="status-activo">● Activo</span>' : '<span class="status-inactivo">● Inactivo</span>'}</td>
+      <td style="font-size:12px;color:var(--g400);">${new Date(u.created).toLocaleDateString('es-CL')}</td>
+      <td>
+        <button class="ab view" onclick="editarUsuario('${u.id}')">Editar</button>
+        &nbsp;
+        <button class="ab" style="color:${u.activo ? '#f59e0b' : 'var(--green)'};" onclick="toggleActivo('${u.id}')">
+          ${u.activo ? 'Desactivar' : 'Activar'}
+        </button>
+        ${u.id !== 'u_admin' ? `&nbsp;<button class="ab del" onclick="eliminarUsuario('${u.id}')">Eliminar</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+  tbl.innerHTML = `<table>
+    <thead><tr>
+      <th>Nombre</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function abrirModalUsuario(id = null) {
+  document.getElementById('mu-id').value = '';
+  document.getElementById('mu-nombre').value = '';
+  document.getElementById('mu-rol').value = 'operador';
+  document.getElementById('mu-activo').value = '1';
+  ['mu-p0','mu-p1','mu-p2','mu-p3'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('mu-title').textContent = 'Nuevo Usuario';
+  document.getElementById('modal-usuario').classList.add('on');
+}
+
+function editarUsuario(id) {
+  const user = getUsers().find(u => u.id === id);
+  if (!user) return;
+  document.getElementById('mu-id').value = id;
+  document.getElementById('mu-nombre').value = user.nombre;
+  document.getElementById('mu-rol').value = user.rol;
+  document.getElementById('mu-activo').value = user.activo ? '1' : '0';
+  ['mu-p0','mu-p1','mu-p2','mu-p3'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('mu-title').textContent = 'Editar Usuario';
+  document.getElementById('modal-usuario').classList.add('on');
+}
+
+function muPinNext(idx) {
+  const val = document.getElementById('mu-p' + idx).value;
+  if (val && idx < 3) document.getElementById('mu-p' + (idx+1)).focus();
+}
+
+function guardarUsuario() {
+  const id = document.getElementById('mu-id').value;
+  const nombre = document.getElementById('mu-nombre').value.trim();
+  const rol = document.getElementById('mu-rol').value;
+  const activo = document.getElementById('mu-activo').value === '1';
+  const pin = ['mu-p0','mu-p1','mu-p2','mu-p3'].map(i => document.getElementById(i).value).join('');
+
+  if (!nombre) { alert('El nombre es obligatorio.'); return; }
+
+  let users = getUsers();
+  if (id) {
+    // Edit existing
+    const idx = users.findIndex(u => u.id === id);
+    if (idx !== -1) {
+      users[idx].nombre = nombre;
+      users[idx].rol = rol;
+      users[idx].activo = activo;
+      if (pin.length === 4) users[idx].pin = pin;
+    }
+  } else {
+    // New user
+    if (pin.length !== 4) { alert('El PIN debe tener 4 dígitos.'); return; }
+    if (users.find(u => u.nombre.toLowerCase() === nombre.toLowerCase())) {
+      alert('Ya existe un usuario con ese nombre.'); return;
+    }
+    users.push({
+      id: 'u_' + Date.now(),
+      nombre, pin, rol, activo,
+      created: new Date().toISOString()
+    });
+  }
+  saveUsers(users);
+  document.getElementById('modal-usuario').classList.remove('on');
+  renderUsuarios();
+  showAlrt('usuarios', id ? `✅ Usuario "${nombre}" actualizado.` : `✅ Usuario "${nombre}" creado correctamente.`, 'ok');
+}
+
+function toggleActivo(id) {
+  let users = getUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx !== -1) {
+    users[idx].activo = !users[idx].activo;
+    saveUsers(users);
+    renderUsuarios();
+  }
+}
+
+function eliminarUsuario(id) {
+  if (!confirm('¿Eliminar este usuario? No se puede deshacer.')) return;
+  let users = getUsers().filter(u => u.id !== id);
+  saveUsers(users);
+  renderUsuarios();
 }
 
 // ═══════════════════════
@@ -1214,11 +1518,11 @@ function showTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('on');
   btn.classList.add('on');
   if (name === 'mani') renderMani();
+  if (name === 'usuarios') renderUsuarios();
   if (name === 'guia') {
-    // Always sync operator from session
-    const op = sessionStorage.getItem('kg_op');
+    const session = getSession();
     const atd = document.getElementById('atd');
-    if (atd && op) atd.value = op;
+    if (atd && session) atd.value = session.nombre;
   }
 }
 
@@ -1403,7 +1707,7 @@ function genGuia(e) {
     vd:  +fd.get('vd') || 0,
     obs: fd.get('obs') || '',
     kg, l, a, h, p,
-    atd: fd.get('atd') || sessionStorage.getItem('kg_op') || '—',
+    atd: fd.get('atd') || getSession()?.nombre || '—',
     tipo_doc,
     estado_pago,
     fecha_pago: estado_pago === 'PAGADO' ? now.toISOString() : null,
@@ -1691,8 +1995,8 @@ document.getElementById('modal').addEventListener('click', function(e) {
 
 function resetFg() {
   document.getElementById('fg').reset();
-  const op = sessionStorage.getItem('kg_op');
-  document.getElementById('atd').value = op || '';
+  const session = getSession();
+  document.getElementById('atd').value = session?.nombre || '';
   document.getElementById('from-calc-badge').classList.remove('show');
   document.getElementById('gbl').textContent = 'Base de cálculo';
   document.getElementById('gbv').textContent = '—';
