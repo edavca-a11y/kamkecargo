@@ -160,7 +160,6 @@ body { font-family:var(--sans); background:var(--g50); color:var(--g800); min-he
   box-shadow:0 1px 3px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.04);
   margin-bottom:18px;
 }
-  
 .ctitle {
   font-family:var(--cond);
   font-size:16px;
@@ -580,7 +579,67 @@ tbody tr:hover td { background:var(--g50); }
   .span2 { grid-column:span 1; }
   .stats { grid-template-columns:1fr 1fr; }
   .tinfo { grid-template-columns:1fr; }
+  .doc-selector, .pago-selector { grid-template-columns:1fr; }
 }
+
+/* DOCUMENTO TIPO */
+.doc-selector {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-bottom:14px;
+}
+.doc-opt {
+  border:2.5px solid var(--g200);
+  border-radius:10px;
+  padding:14px 16px;
+  cursor:pointer;
+  transition:.18s;
+  position:relative;
+}
+.doc-opt:has(input:checked) { border-color:var(--orange); background:#fff7f0; }
+.doc-opt input[type=radio] { position:absolute; opacity:0; width:0; height:0; }
+.doc-opt .dot { width:14px; height:14px; border-radius:50%; border:2px solid var(--g200); display:inline-block; margin-right:8px; vertical-align:middle; transition:.15s; flex-shrink:0; }
+.doc-opt:has(input:checked) .dot { border-color:var(--orange); background:var(--orange); }
+.doc-opt .dlabel { font-family:var(--cond); font-size:16px; font-weight:800; color:var(--navy); }
+.doc-opt .ddesc { font-size:12px; color:var(--g400); margin-top:4px; line-height:1.4; }
+
+/* ESTADO PAGO */
+.pago-selector {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:14px;
+  display:none;
+}
+.pago-selector.show { display:grid; }
+.pago-opt {
+  border:2.5px solid var(--g200);
+  border-radius:10px;
+  padding:12px 14px;
+  cursor:pointer;
+  transition:.18s;
+  position:relative;
+}
+.pago-opt:has(input:checked).pagado { border-color:var(--green); background:#f0fdf4; }
+.pago-opt:has(input:checked).pendiente { border-color:#f59e0b; background:#fffbeb; }
+.pago-opt input[type=radio] { position:absolute; opacity:0; width:0; height:0; }
+
+/* PAYMENT STATUS BADGES */
+.badge-pagado { display:inline-flex; align-items:center; gap:4px; background:#dcfce7; color:#166534; font-size:11px; font-weight:700; padding:3px 8px; border-radius:4px; }
+.badge-pendiente { display:inline-flex; align-items:center; gap:4px; background:#fef3c7; color:#92400e; font-size:11px; font-weight:700; padding:3px 8px; border-radius:4px; }
+.badge-boleta { display:inline-flex; align-items:center; gap:4px; background:#eff6ff; color:#1d4ed8; font-size:11px; font-weight:700; padding:3px 8px; border-radius:4px; }
+.badge-factura { display:inline-flex; align-items:center; gap:4px; background:#faf5ff; color:#7e22ce; font-size:11px; font-weight:700; padding:3px 8px; border-radius:4px; }
+
+/* PENDING ROW HIGHLIGHT */
+tr.por-pagar td { background:#fffbeb !important; }
+tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
+
+/* STATS 5-col */
+.stats { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px; }
+.scard.danger { border-left-color:var(--red); }
+.scard.warning { border-left-color:#f59e0b; }
+.scard.success { border-left-color:var(--green); }
 </style>
 </head>
 <body>
@@ -730,6 +789,53 @@ tbody tr:hover td { background:var(--g50); }
     </div>
 
     <div class="card">
+      <div class="ctitle">🧾 Documento y Pago</div>
+      <div class="slbl">Tipo de Documento <span class="req">*</span></div>
+      <div class="doc-selector">
+        <label class="doc-opt" onclick="onDocType('BOLETA')">
+          <input type="radio" name="tipo_doc" value="BOLETA" required checked>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span class="dot"></span>
+            <span class="dlabel">🧾 BOLETA</span>
+          </div>
+          <div class="ddesc">Pago inmediato al momento de la recepción. La carga se acepta y despacha de inmediato.</div>
+        </label>
+        <label class="doc-opt" onclick="onDocType('FACTURA')">
+          <input type="radio" name="tipo_doc" value="FACTURA">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span class="dot"></span>
+            <span class="dlabel">📄 FACTURA</span>
+          </div>
+          <div class="ddesc">Para clientes con crédito o pago diferido. La carga queda retenida hasta confirmar el pago.</div>
+        </label>
+      </div>
+
+      <div class="pago-selector" id="pago-selector">
+        <div class="slbl" style="grid-column:span 2;margin-top:0;">Estado de Pago <span class="req">*</span></div>
+        <label class="pago-opt pagado">
+          <input type="radio" name="estado_pago" value="PAGADO" checked>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="dot"></span>
+            <span style="font-family:var(--cond);font-size:15px;font-weight:800;color:var(--green);">✅ PAGADO AL CONTADO</span>
+          </div>
+          <div style="font-size:12px;color:var(--g400);margin-top:4px;">La factura fue cancelada. La carga puede entregarse.</div>
+        </label>
+        <label class="pago-opt pendiente">
+          <input type="radio" name="estado_pago" value="POR PAGAR">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="dot"></span>
+            <span style="font-family:var(--cond);font-size:15px;font-weight:800;color:#92400e;">⏳ POR PAGAR</span>
+          </div>
+          <div style="font-size:12px;color:var(--g400);margin-top:4px;">La factura está emitida pero pendiente de pago. Carga retenida hasta confirmar.</div>
+        </label>
+      </div>
+
+      <div id="retencion-alert" style="display:none;margin-top:14px;padding:12px 16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;font-size:13px;color:#92400e;font-weight:600;">
+        ⚠️ Carga RETENIDA — No se entrega hasta confirmar el pago. El cliente debe cancelar la factura antes de retirar su envío.
+      </div>
+    </div>
+
+    <div class="card">
       <div class="ctitle">📐 Medidas y Precio Final</div>
       <div id="from-calc-badge" class="from-calc-badge">
         ⚡ Medidas cargadas desde la Calculadora
@@ -787,10 +893,11 @@ tbody tr:hover td { background:var(--g50); }
   </div>
 
   <div class="stats">
-    <div class="scard"><div class="slb">Guías del día</div><div class="svl" id="sct">0</div></div>
+    <div class="scard success"><div class="slb">Guías del día</div><div class="svl" id="sct">0</div></div>
     <div class="scard"><div class="slb">Kg total</div><div class="svl" id="skg">0,0</div></div>
-    <div class="scard"><div class="slb">Total a cobrar</div><div class="svl sm" id="stot">$0</div></div>
-    <div class="scard"><div class="slb">Destinos únicos</div><div class="svl" id="sdst">0</div></div>
+    <div class="scard success"><div class="slb">Total cobrado</div><div class="svl sm" id="stot">$0</div></div>
+    <div class="scard warning"><div class="slb">Facturas pendientes</div><div class="svl" id="sfact">0</div></div>
+    <div class="scard danger"><div class="slb">Monto pendiente</div><div class="svl sm" id="spend">$0</div></div>
   </div>
 
   <div id="alrt-mani" class="alert"></div>
@@ -1166,6 +1273,47 @@ function limpiarMedidas() {
 }
 
 // ═══════════════════════
+// DOC TYPE TOGGLE
+// ═══════════════════════
+function onDocType(tipo) {
+  const sel = document.getElementById('pago-selector');
+  const alert = document.getElementById('retencion-alert');
+  if (tipo === 'FACTURA') {
+    sel.classList.add('show');
+  } else {
+    sel.classList.remove('show');
+    alert.style.display = 'none';
+    // Reset estado pago to PAGADO for boleta
+    const pagadoRadio = document.querySelector('input[name="estado_pago"][value="PAGADO"]');
+    if (pagadoRadio) pagadoRadio.checked = true;
+  }
+}
+
+// Watch estado_pago changes
+document.addEventListener('change', function(e) {
+  if (e.target.name === 'estado_pago') {
+    const alert = document.getElementById('retencion-alert');
+    alert.style.display = e.target.value === 'POR PAGAR' ? 'block' : 'none';
+  }
+});
+
+// ═══════════════════════
+// VALIDACIÓN COMPLETA
+// ═══════════════════════
+function validarFormulario(fd) {
+  const errores = [];
+  if (!fd.get('rn')?.trim()) errores.push('Nombre del remitente');
+  if (!fd.get('dn')?.trim()) errores.push('Nombre del destinatario');
+  if (!fd.get('dd')?.trim()) errores.push('Dirección del destinatario');
+  if (!fd.get('dl')?.trim()) errores.push('Localidad / Ciudad del destinatario');
+  if (!fd.get('dst')?.trim()) errores.push('Destino');
+  if (!fd.get('cnt')?.trim()) errores.push('Contenido del envío');
+  if (!fd.get('kg') || +fd.get('kg') <= 0) errores.push('Peso real (kg)');
+  if (!fd.get('tipo_doc')) errores.push('Tipo de documento (Boleta/Factura)');
+  return errores;
+}
+
+// ═══════════════════════
 // GENERAR GUÍA
 // ═══════════════════════
 let guiaActual = null;
@@ -1175,11 +1323,23 @@ function genGuia(e) {
   const fd = new FormData(document.getElementById('fg'));
   const c  = getCfg();
 
+  // Validación estricta
+  const errores = validarFormulario(fd);
+  if (errores.length > 0) {
+    showAlrt('guia', '❌ Campos obligatorios incompletos: ' + errores.join(', '), 'er');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
   const kg = +fd.get('kg') || 0;
   const l  = +fd.get('gl') || 0;
   const a  = +fd.get('ga') || 0;
   const h  = +fd.get('gh') || 0;
   const p  = precio(kg, l, a, h);
+
+  const tipo_doc    = fd.get('tipo_doc') || 'BOLETA';
+  // Boleta siempre PAGADO; Factura usa el radio seleccionado
+  const estado_pago = tipo_doc === 'BOLETA' ? 'PAGADO' : (fd.get('estado_pago') || 'POR PAGAR');
 
   const now     = new Date();
   const dateKey = now.toISOString().slice(0,10).replace(/-/g,'');
@@ -1201,7 +1361,10 @@ function genGuia(e) {
     vd:  +fd.get('vd') || 0,
     obs: fd.get('obs') || '',
     kg, l, a, h, p,
-    atd: fd.get('atd') || sessionStorage.getItem('kg_op') || '—'
+    atd: fd.get('atd') || sessionStorage.getItem('kg_op') || '—',
+    tipo_doc,
+    estado_pago,
+    fecha_pago: estado_pago === 'PAGADO' ? now.toISOString() : null,
   };
 
   guias.push(g);
@@ -1285,12 +1448,14 @@ function renderMani() {
   const items  = guias.filter(g => g.fecha.startsWith(fecha));
   const totKg  = items.reduce((s,g) => s + (g.kg||0), 0);
   const totCob = items.reduce((s,g) => s + (g.p?.tot||0), 0);
-  const uDsts  = new Set(items.map(g => g.des)).size;
+  const pendientes = items.filter(g => g.estado_pago === 'POR PAGAR');
+  const totPend = pendientes.reduce((s,g) => s + (g.p?.tot||0), 0);
 
   document.getElementById('sct').textContent  = items.length;
   document.getElementById('skg').textContent  = totKg.toFixed(1);
   document.getElementById('stot').textContent = fmt(totCob);
-  document.getElementById('sdst').textContent = uDsts;
+  document.getElementById('sfact').textContent = pendientes.length;
+  document.getElementById('spend').textContent = fmt(totPend);
 
   const tbl = document.getElementById('mtbl');
   if (!items.length) {
@@ -1302,17 +1467,37 @@ function renderMani() {
     return;
   }
 
+  // Warning banner if there are pending invoices
+  const pendWarning = pendientes.length > 0
+    ? `<div style="padding:10px 14px;background:#fef3c7;border-bottom:2px solid #f59e0b;font-size:13px;color:#92400e;font-weight:600;">
+        ⚠️ ${pendientes.length} factura(s) POR PAGAR · Monto retenido: ${fmt(totPend)} — La carga NO se entrega hasta confirmar el pago.
+      </div>`
+    : '';
+
   const rows = items.map(g => {
     const hora = new Date(g.fecha).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
-    return `<tr>
+    const docBadge = g.tipo_doc === 'FACTURA'
+      ? `<span class="badge-factura">📄 FACT</span>`
+      : `<span class="badge-boleta">🧾 BOL</span>`;
+    const pagoBadge = g.estado_pago === 'POR PAGAR'
+      ? `<span class="badge-pendiente">⏳ POR PAGAR</span>`
+      : `<span class="badge-pagado">✅ PAGADO</span>`;
+    const pagarBtn = g.estado_pago === 'POR PAGAR'
+      ? `<button class="ab" style="color:var(--green);margin-right:4px;" onclick="marcarPagado('${g.id}')">💰 Pagar</button>`
+      : '';
+    const rowClass = g.estado_pago === 'POR PAGAR' ? ' class="por-pagar"' : '';
+    return `<tr${rowClass}>
       <td class="mc" style="font-weight:700;color:var(--navy);">${g.id}</td>
       <td style="color:var(--g400);font-size:12px;">${hora}</td>
       <td>${g.rem.n}</td>
       <td>${g.dst.n}</td>
       <td><span class="dtag">📍 ${g.des}</span></td>
       <td class="mc">${g.kg} kg</td>
+      <td>${docBadge}</td>
+      <td>${pagoBadge}</td>
       <td class="mc" style="font-weight:700;color:var(--navy);">${fmt(g.p?.tot||0)}</td>
       <td>
+        ${pagarBtn}
         <button class="ab view" onclick="verG('${g.id}')">Ver</button>
         &nbsp;
         <button class="ab del" onclick="delG('${g.id}')">Eliminar</button>
@@ -1320,21 +1505,27 @@ function renderMani() {
     </tr>`;
   }).join('');
 
-  const totalRow = `<tr style="background:var(--g50);">
-    <td colspan="5" style="text-align:right;font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--g400);">TOTAL DEL DÍA</td>
-    <td class="mc" style="font-weight:700;">${totKg.toFixed(1)} kg</td>
-    <td class="mc" style="font-weight:700;color:var(--orange);">${fmt(totCob)}</td>
-    <td></td>
-  </tr>`;
-
-  tbl.innerHTML = `<table>
+  tbl.innerHTML = `${pendWarning}<table>
     <thead><tr>
       <th>N° Guía</th><th>Hora</th><th>Remitente</th>
       <th>Destinatario</th><th>Destino</th><th>Peso</th>
-      <th>Total</th><th>Acciones</th>
+      <th>Doc.</th><th>Pago</th><th>Total</th><th>Acciones</th>
     </tr></thead>
-    <tbody>${rows}${totalRow}</tbody>
+    <tbody>${rows}</tbody>
   </table>`;
+}
+
+function marcarPagado(id) {
+  if (!confirm('¿Confirmar pago de esta factura? Se marcará como PAGADO y la carga podrá ser entregada.')) return;
+  let guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
+  const idx = guias.findIndex(g => g.id === id);
+  if (idx !== -1) {
+    guias[idx].estado_pago = 'PAGADO';
+    guias[idx].fecha_pago = new Date().toISOString();
+    localStorage.setItem('kg_guias', JSON.stringify(guias));
+    showAlrt('mani', `✅ Guía ${id} marcada como PAGADO. La carga puede entregarse.`, 'ok');
+    renderMani();
+  }
 }
 
 function verG(id) {
@@ -1383,20 +1574,33 @@ async function sendReport() {
 
   const totCob = items.reduce((s,g) => s + (g.p?.tot||0), 0);
   const totKg  = items.reduce((s,g) => s + (g.kg||0), 0);
+  const pendientes = items.filter(g => g.estado_pago === 'POR PAGAR');
+  const totPend = pendientes.reduce((s,g) => s + (g.p?.tot||0), 0);
   const fDisplay = new Date(fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
   const detalle = items.map((g,i) =>
-    `${i+1}. [${g.id}] ${g.rem.n} → ${g.dst.n} | ${g.des} | ${g.kg}kg | ${fmt(g.p?.tot||0)}`
+    `${i+1}. [${g.id}] ${g.rem.n} → ${g.dst.n} | ${g.des} | ${g.kg}kg | ${fmt(g.p?.tot||0)} | ${g.tipo_doc||'BOLETA'} | ${g.estado_pago||'PAGADO'}`
   ).join('\n');
+
+  const pendDetalle = pendientes.length > 0
+    ? `\n⚠️ FACTURAS PENDIENTES DE COBRO:\n` + pendientes.map(g => `  - [${g.id}] ${g.dst.n} · ${g.des} · ${fmt(g.p?.tot||0)}`).join('\n')
+    : '';
 
   const msg = `REPORTE DIARIO — ${c.emp || 'TRANSPORTES KAMKE'}
 Fecha: ${fDisplay}
 
 RESUMEN:
-  • Total guías:         ${items.length}
-  • Kg despachados:      ${totKg.toFixed(1)} kg
-  • Total a cobrar:      ${fmt(totCob)}
-  • Destinos únicos:     ${new Set(items.map(g=>g.des)).size}
+  • Total guías:              ${items.length}
+  • Kg despachados:           ${totKg.toFixed(1)} kg
+  • Total cobrado:            ${fmt(totCob - totPend)}
+  • Facturas pendientes:      ${pendientes.length} (${fmt(totPend)})
+${pendDetalle}
+
+DETALLE DE GUÍAS:
+${detalle}
+
+---
+Generado automáticamente por KamkeCargo System`;
 
 DETALLE DE GUÍAS:
 ${detalle}
