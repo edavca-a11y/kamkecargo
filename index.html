@@ -756,7 +756,7 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
 
 <!-- ═══ CALCULADORA ═══ -->
 <div id="tab-calc" class="panel on">
-  <div id="calc-alert" class="alert"></div>
+  <div id="alrt-calc" class="alert"></div>
   <div class="tinfo">
     <div class="ti"><div class="tl">Costo Fijo</div><div class="tv">$22.000</div></div>
     <div class="ti"><div class="tl">Por Kg (IVA inc.)</div><div class="tv">$257</div></div>
@@ -1636,7 +1636,7 @@ function pasarAGuia() {
   if (!h || +h <= 0) faltantes.push('Alto (cm)');
 
   if (faltantes.length > 0) {
-    showAlrt('calc-alert', '❌ Completa todos los campos para continuar: ' + faltantes.join(', '), 'er');
+    showAlrt('calc', '❌ Completa todos los campos para continuar: ' + faltantes.join(', '), 'er');
     return;
   }
   // Switch to guía tab
