@@ -831,9 +831,9 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
       <div class="ctitle">📤 Remitente — quien envía</div>
       <div class="g2">
         <div class="f"><label>Nombre Completo <span class="req">*</span></label><input name="rn" required placeholder="Juan Pérez García"></div>
-        <div class="f"><label>RUT</label><input name="rr" placeholder="12.345.678-9" class="mono" oninput="fmtRut(this)"></div>
-        <div class="f"><label>Dirección</label><input name="rd" placeholder="Av. Ejemplo 1234"></div>
-        <div class="f"><label>Teléfono</label><input name="rt" placeholder="+56 9 1234 5678"></div>
+        <div class="f"><label>RUT <span class="req">*</span></label><input name="rr" required placeholder="12.345.678-9" class="mono" oninput="fmtRut(this)"></div>
+        <div class="f"><label>Dirección <span class="req">*</span></label><input name="rd" required placeholder="Av. Ejemplo 1234"></div>
+        <div class="f"><label>Teléfono <span class="req">*</span></label><input name="rt" required placeholder="+56 9 1234 5678"></div>
       </div>
     </div>
 
@@ -841,9 +841,9 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
       <div class="ctitle">📥 Destinatario — quien recibe</div>
       <div class="g2">
         <div class="f"><label>Nombre Completo <span class="req">*</span></label><input name="dn" required placeholder="María González López"></div>
-        <div class="f"><label>RUT</label><input name="dr" placeholder="11.222.333-4" class="mono" oninput="fmtRut(this)"></div>
+        <div class="f"><label>RUT <span class="req">*</span></label><input name="dr" required placeholder="11.222.333-4" class="mono" oninput="fmtRut(this)"></div>
         <div class="f"><label>Dirección <span class="req">*</span></label><input name="dd" required placeholder="Calle Principal 567"></div>
-        <div class="f"><label>Teléfono</label><input name="dt" placeholder="+56 9 8765 4321"></div>
+        <div class="f"><label>Teléfono <span class="req">*</span></label><input name="dt" required placeholder="+56 9 8765 4321"></div>
         <div class="f span2"><label>Localidad / Ciudad <span class="req">*</span></label><input name="dl" required placeholder="Santiago Centro, Punta Arenas..."></div>
       </div>
     </div>
@@ -867,7 +867,7 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
         </div>
         <div class="f"><label>Destino <span class="req">*</span></label><input name="dst" required placeholder="Punta Arenas, Mendoza, Osorno..."></div>
         <div class="f"><label>Contenido <span class="req">*</span></label><input name="cnt" required placeholder="Documentos, Repuestos, Mercadería..."></div>
-        <div class="f"><label>Valor Declarado ($)</label><input name="vd" type="number" min="0" placeholder="0" class="mono"></div>
+        <div class="f"><label>Valor Declarado ($) <span class="req">*</span></label><input name="vd" required type="number" min="1" placeholder="0" class="mono"></div>
         <div class="f span2"><label>Observaciones</label><input name="obs" placeholder="Frágil, urgente, refrigerado..."></div>
       </div>
       <!-- Tipo de servicio siempre ESTÁNDAR -->
@@ -929,9 +929,9 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
       </div>
       <div class="g4">
         <div class="f"><label>Peso Real (kg) <span class="req">*</span></label><input name="kg" id="gk" type="number" required min="0.01" step="0.01" placeholder="0.0" class="mono" oninput="gCalc()"></div>
-        <div class="f"><label>Largo (cm)</label><input name="gl" id="gl" type="number" min="0" placeholder="0" oninput="gCalc()"></div>
-        <div class="f"><label>Ancho (cm)</label><input name="ga" id="ga" type="number" min="0" placeholder="0" oninput="gCalc()"></div>
-        <div class="f"><label>Alto (cm)</label><input name="gh" id="gh" type="number" min="0" placeholder="0" oninput="gCalc()"></div>
+        <div class="f"><label>Largo (cm) <span class="req">*</span></label><input name="gl" id="gl" type="number" required min="1" placeholder="0" oninput="gCalc()"></div>
+        <div class="f"><label>Ancho (cm) <span class="req">*</span></label><input name="ga" id="ga" type="number" required min="1" placeholder="0" oninput="gCalc()"></div>
+        <div class="f"><label>Alto (cm) <span class="req">*</span></label><input name="gh" id="gh" type="number" required min="1" placeholder="0" oninput="gCalc()"></div>
       </div>
       <div style="margin-top:18px;">
         <div class="pbox">
@@ -1690,13 +1690,27 @@ document.addEventListener('change', function(e) {
 // ═══════════════════════
 function validarFormulario(fd) {
   const errores = [];
+  // Remitente
   if (!fd.get('rn')?.trim()) errores.push('Nombre del remitente');
+  if (!fd.get('rr')?.trim()) errores.push('RUT del remitente');
+  if (!fd.get('rd')?.trim()) errores.push('Dirección del remitente');
+  if (!fd.get('rt')?.trim()) errores.push('Teléfono del remitente');
+  // Destinatario
   if (!fd.get('dn')?.trim()) errores.push('Nombre del destinatario');
+  if (!fd.get('dr')?.trim()) errores.push('RUT del destinatario');
   if (!fd.get('dd')?.trim()) errores.push('Dirección del destinatario');
+  if (!fd.get('dt')?.trim()) errores.push('Teléfono del destinatario');
   if (!fd.get('dl')?.trim()) errores.push('Localidad / Ciudad del destinatario');
+  // Envío
   if (!fd.get('dst')?.trim()) errores.push('Destino');
   if (!fd.get('cnt')?.trim()) errores.push('Contenido del envío');
+  if (!fd.get('vd') || +fd.get('vd') <= 0) errores.push('Valor declarado');
+  // Medidas
   if (!fd.get('kg') || +fd.get('kg') <= 0) errores.push('Peso real (kg)');
+  if (!fd.get('gl') || +fd.get('gl') <= 0) errores.push('Largo (cm)');
+  if (!fd.get('ga') || +fd.get('ga') <= 0) errores.push('Ancho (cm)');
+  if (!fd.get('gh') || +fd.get('gh') <= 0) errores.push('Alto (cm)');
+  // Documento
   if (!fd.get('tipo_doc')) errores.push('Tipo de documento (Boleta/Factura)');
   return errores;
 }
