@@ -8,6 +8,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 :root {
   --navy: #14213d;
@@ -1261,6 +1264,21 @@ tr.por-pagar td:first-child { border-left:4px solid #f59e0b; }
 
 <script>
 // ═══════════════════════
+// FIREBASE INIT
+// ═══════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyBvSdN2jIhxygNrt0oOoPvHAGPqL1q7g4k",
+  authDomain: "kamkecargo.firebaseapp.com",
+  projectId: "kamkecargo",
+  storageBucket: "kamkecargo.firebasestorage.app",
+  messagingSenderId: "94136201534",
+  appId: "1:94136201534:web:8f0fb8a5f572885312bc6f"
+};
+firebase.initializeApp(firebaseConfig);
+const db   = firebase.firestore();
+const auth = firebase.auth();
+
+// ═══════════════════════
 // TARIFAS
 // ═══════════════════════
 const TARIFA_FIJA = 22000;
@@ -1268,46 +1286,132 @@ const TARIFA_KG   = 257;
 const TARIFA_M3   = 92820;
 
 // ═══════════════════════
+// FIRESTORE HELPERS
+// ═══════════════════════
+async function db_getGuias(desde, hasta) {
+  try {
+    const snap = await db.collection('guias')
+      .where('fecha', '>=', desde + 'T00:00:00')
+      .where('fecha', '<=', hasta + 'T23:59:59')
+      .orderBy('fecha', 'asc').get();
+    return snap.docs.map(d => d.data());
+  } catch(e) { console.error('db_getGuias:', e); return []; }
+}
+
+async function db_getAllGuias() {
+  try {
+    const snap = await db.collection('guias').orderBy('fecha','asc').get();
+    return snap.docs.map(d => d.data());
+  } catch(e) { console.error('db_getAllGuias:', e); return []; }
+}
+
+async function db_saveGuia(guia) {
+  await db.collection('guias').doc(guia.id).set(guia);
+}
+
+async function db_deleteGuia(id) {
+  await db.collection('guias').doc(id).delete();
+}
+
+async function db_updateGuia(id, data) {
+  await db.collection('guias').doc(id).update(data);
+}
+
+function db_listenMani(desde, hasta, callback) {
+  return db.collection('guias')
+    .where('fecha', '>=', desde + 'T00:00:00')
+    .where('fecha', '<=', hasta + 'T23:59:59')
+    .orderBy('fecha', 'asc')
+    .onSnapshot(snap => callback(snap.docs.map(d => d.data())));
+}
+
+async function db_getUsers() {
+  try {
+    const snap = await db.collection('usuarios').get();
+    return snap.docs.map(d => d.data());
+  } catch(e) { return []; }
+}
+
+async function db_saveUser(user) {
+  await db.collection('usuarios').doc(user.id).set(user);
+}
+
+async function db_deleteUser(id) {
+  await db.collection('usuarios').doc(id).delete();
+}
+
+async function db_getCfg() {
+  try {
+    const doc = await db.collection('config').doc('main').get();
+    return doc.exists ? doc.data() : {};
+  } catch(e) { return {}; }
+}
+
+async function db_saveCfg(cfg) {
+  await db.collection('config').doc('main').set(cfg);
+}
+
+// ═══════════════════════
+// USER CACHE
+// ═══════════════════════
+let _users = [];
+function getUsers() { return _users; }
+
+// ═══════════════════════
 // INIT
 // ═══════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  initUsers();
-  loadCfg();
-  const hoy = new Date().toISOString().slice(0,10);
-  document.getElementById('fdate').value = hoy;
-  renderMani();
-  const session = getSession();
-  if (session) {
-    const users = getUsers();
-    const user = users.find(u => u.id === session.id && u.activo);
-    if (user) { setSession(user); }
-    else { showLoginModal(); }
-  } else {
-    showLoginModal();
+let maniUnsubscribe = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  showLoading(true);
+  try {
+    // Autenticación anónima — requerida por las reglas de Firestore
+    await auth.signInAnonymously();
+    await initUsers();
+    await loadCfg();
+    const hoy = new Date().toISOString().slice(0,10);
+    document.getElementById('fdate').value = hoy;
+    const session = getSession();
+    if (session) {
+      const user = _users.find(u => u.id === session.id && u.activo);
+      if (user) { setSession(user); }
+      else { showLoginModal(); }
+    } else {
+      showLoginModal();
+    }
+    renderMani();
+  } catch(err) {
+    console.error('Error de inicio:', err);
+    showAlrt('guia', '❌ Error al conectar con la base de datos. Verifica tu conexión.', 'er');
+  } finally {
+    showLoading(false);
   }
 });
+
+function showLoading(on) {
+  let el = document.getElementById('loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(20,33,61,.85);z-index:999;display:flex;align-items:center;justify-content:center;';
+    el.innerHTML = '<div style="text-align:center;color:#fff;"><div style="font-size:40px;margin-bottom:12px;">🚛</div><div style="font-family:Barlow Condensed,sans-serif;font-size:20px;font-weight:700;letter-spacing:2px;">CARGANDO...</div></div>';
+    document.body.appendChild(el);
+  }
+  el.style.display = on ? 'flex' : 'none';
+}
 
 // ═══════════════════════
 // GESTIÓN DE USUARIOS
 // ═══════════════════════
-function getUsers() {
-  return JSON.parse(localStorage.getItem('kg_users') || '[]');
-}
-function saveUsers(users) {
-  localStorage.setItem('kg_users', JSON.stringify(users));
-}
-function initUsers() {
-  if (!localStorage.getItem('kg_users')) {
-    saveUsers([{
-      id: 'u_admin',
-      nombre: 'Administrador',
-      pin: '1234',
-      rol: 'admin',
-      activo: true,
-      created: new Date().toISOString()
-    }]);
+async function initUsers() {
+  _users = await db_getUsers();
+  if (_users.length === 0) {
+    const admin = { id:'u_admin', nombre:'Administrador', pin:'1234', rol:'admin', activo:true, created:new Date().toISOString() };
+    await db_saveUser(admin);
+    _users = [admin];
   }
 }
+
 function getSession() {
   const s = sessionStorage.getItem('kg_session');
   return s ? JSON.parse(s) : null;
@@ -1335,9 +1439,7 @@ function renderLoginCards() {
   const users = getUsers().filter(u => u.activo);
   const container = document.getElementById('login-user-cards');
   if (!users.length) {
-    container.innerHTML = `<div style="grid-column:span 2;color:rgba(255,255,255,.5);text-align:center;padding:20px;">
-      No hay usuarios activos. Contacta al administrador.
-    </div>`;
+    container.innerHTML = `<div style="grid-column:span 2;color:rgba(255,255,255,.5);text-align:center;padding:20px;">No hay usuarios activos. Contacta al administrador.</div>`;
     return;
   }
   container.innerHTML = users.map(u => `
@@ -1349,30 +1451,25 @@ function renderLoginCards() {
 }
 
 function selectUser(id) {
-  const users = getUsers();
-  loginSelectedUser = users.find(u => u.id === id);
+  loginSelectedUser = _users.find(u => u.id === id);
   if (!loginSelectedUser) return;
-  // Show PIN step
   document.getElementById('login-step1').style.display = 'none';
   document.getElementById('login-step2').style.display = 'block';
   document.getElementById('login-subtitle').textContent = '¡Hola! Ingresa tu PIN';
   document.getElementById('login-username-display').textContent = loginSelectedUser.nombre;
-  // Clear PIN inputs
   ['p0','p1','p2','p3'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('pin-error').classList.remove('show');
   setTimeout(() => document.getElementById('p0').focus(), 100);
 }
 
 function pinNext(idx) {
-  const val = document.getElementById('p' + idx).value;
-  if (val && idx < 3) document.getElementById('p' + (idx+1)).focus();
+  const val = document.getElementById('p'+idx).value;
+  if (val && idx < 3) document.getElementById('p'+(idx+1)).focus();
   if (idx === 3 && val) verificarPin();
 }
-
 function pinKey(e, idx) {
-  if (e.key === 'Backspace' && !document.getElementById('p' + idx).value && idx > 0) {
-    document.getElementById('p' + (idx-1)).focus();
-  }
+  if (e.key === 'Backspace' && !document.getElementById('p'+idx).value && idx > 0)
+    document.getElementById('p'+(idx-1)).focus();
 }
 
 function verificarPin() {
@@ -1396,52 +1493,42 @@ function volverStep1() {
 }
 
 function setSession(user) {
-  const session = { id: user.id, nombre: user.nombre, rol: user.rol };
-  sessionStorage.setItem('kg_session', JSON.stringify(session));
+  sessionStorage.setItem('kg_session', JSON.stringify({ id:user.id, nombre:user.nombre, rol:user.rol }));
   document.getElementById('hdr-op').textContent = user.nombre;
   document.getElementById('hdr-role').textContent = user.rol === 'admin' ? 'admin' : '';
-  // Show/hide admin tab
   document.getElementById('btn-usuarios').style.display = user.rol === 'admin' ? 'inline-flex' : 'none';
   const atd = document.getElementById('atd');
   if (atd) atd.value = user.nombre;
 }
 
-function changeOperator() {
-  showLoginModal();
-}
+function changeOperator() { showLoginModal(); }
 
 // ═══════════════════════
-// RENDER USUARIOS TAB
+// USUARIOS TAB
 // ═══════════════════════
-function renderUsuarios() {
-  const users = getUsers();
+async function renderUsuarios() {
+  const users = await db_getUsers();
+  _users = users;
   const tbl = document.getElementById('usuarios-tbl');
   if (!tbl) return;
-  const rows = users.map(u => `
-    <tr>
+  if (!users.length) { tbl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--g400);">No hay usuarios.</div>'; return; }
+  tbl.innerHTML = `<table>
+    <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
+    <tbody>${users.map(u => `<tr>
       <td style="font-weight:700;color:var(--navy);">${u.nombre}</td>
-      <td><span class="role-badge ${u.rol === 'admin' ? 'role-admin' : 'role-operador'}">${u.rol === 'admin' ? '👑 Admin' : '👤 Operador'}</span></td>
-      <td>${u.activo ? '<span class="status-activo">● Activo</span>' : '<span class="status-inactivo">● Inactivo</span>'}</td>
+      <td><span class="role-badge ${u.rol==='admin'?'role-admin':'role-operador'}">${u.rol==='admin'?'👑 Admin':'👤 Operador'}</span></td>
+      <td>${u.activo?'<span class="status-activo">● Activo</span>':'<span class="status-inactivo">● Inactivo</span>'}</td>
       <td style="font-size:12px;color:var(--g400);">${new Date(u.created).toLocaleDateString('es-CL')}</td>
       <td>
-        <button class="ab view" onclick="editarUsuario('${u.id}')">Editar</button>
-        &nbsp;
-        <button class="ab" style="color:${u.activo ? '#f59e0b' : 'var(--green)'};" onclick="toggleActivo('${u.id}')">
-          ${u.activo ? 'Desactivar' : 'Activar'}
-        </button>
-        ${u.id !== 'u_admin' ? `&nbsp;<button class="ab del" onclick="eliminarUsuario('${u.id}')">Eliminar</button>` : ''}
+        <button class="ab view" onclick="editarUsuario('${u.id}')">Editar</button> &nbsp;
+        <button class="ab" style="color:${u.activo?'#f59e0b':'var(--green)'};" onclick="toggleActivo('${u.id}',${!u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+        ${u.id!=='u_admin'?`&nbsp;<button class="ab del" onclick="eliminarUsuario('${u.id}')">Eliminar</button>`:''}
       </td>
-    </tr>
-  `).join('');
-  tbl.innerHTML = `<table>
-    <thead><tr>
-      <th>Nombre</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
+    </tr>`).join('')}</tbody>
   </table>`;
 }
 
-function abrirModalUsuario(id = null) {
+function abrirModalUsuario() {
   document.getElementById('mu-id').value = '';
   document.getElementById('mu-nombre').value = '';
   document.getElementById('mu-rol').value = 'operador';
@@ -1452,7 +1539,7 @@ function abrirModalUsuario(id = null) {
 }
 
 function editarUsuario(id) {
-  const user = getUsers().find(u => u.id === id);
+  const user = _users.find(u => u.id === id);
   if (!user) return;
   document.getElementById('mu-id').value = id;
   document.getElementById('mu-nombre').value = user.nombre;
@@ -1464,83 +1551,67 @@ function editarUsuario(id) {
 }
 
 function muPinNext(idx) {
-  const val = document.getElementById('mu-p' + idx).value;
-  if (val && idx < 3) document.getElementById('mu-p' + (idx+1)).focus();
+  if (document.getElementById('mu-p'+idx).value && idx < 3)
+    document.getElementById('mu-p'+(idx+1)).focus();
 }
 
-function guardarUsuario() {
-  const id = document.getElementById('mu-id').value;
+async function guardarUsuario() {
+  const id     = document.getElementById('mu-id').value;
   const nombre = document.getElementById('mu-nombre').value.trim();
-  const rol = document.getElementById('mu-rol').value;
+  const rol    = document.getElementById('mu-rol').value;
   const activo = document.getElementById('mu-activo').value === '1';
-  const pin = ['mu-p0','mu-p1','mu-p2','mu-p3'].map(i => document.getElementById(i).value).join('');
-
+  const pin    = ['mu-p0','mu-p1','mu-p2','mu-p3'].map(i => document.getElementById(i).value).join('');
   if (!nombre) { alert('El nombre es obligatorio.'); return; }
-
-  let users = getUsers();
+  let user;
   if (id) {
-    // Edit existing
-    const idx = users.findIndex(u => u.id === id);
-    if (idx !== -1) {
-      users[idx].nombre = nombre;
-      users[idx].rol = rol;
-      users[idx].activo = activo;
-      if (pin.length === 4) users[idx].pin = pin;
-    }
+    user = _users.find(u => u.id === id);
+    user = { ...user, nombre, rol, activo };
+    if (pin.length === 4) user.pin = pin;
   } else {
-    // New user
     if (pin.length !== 4) { alert('El PIN debe tener 4 dígitos.'); return; }
-    if (users.find(u => u.nombre.toLowerCase() === nombre.toLowerCase())) {
-      alert('Ya existe un usuario con ese nombre.'); return;
-    }
-    users.push({
-      id: 'u_' + Date.now(),
-      nombre, pin, rol, activo,
-      created: new Date().toISOString()
-    });
+    if (_users.find(u => u.nombre.toLowerCase() === nombre.toLowerCase())) { alert('Ya existe un usuario con ese nombre.'); return; }
+    user = { id:'u_'+Date.now(), nombre, pin, rol, activo, created:new Date().toISOString() };
   }
-  saveUsers(users);
+  await db_saveUser(user);
   document.getElementById('modal-usuario').classList.remove('on');
-  renderUsuarios();
-  showAlrt('usuarios', id ? `✅ Usuario "${nombre}" actualizado.` : `✅ Usuario "${nombre}" creado correctamente.`, 'ok');
+  await renderUsuarios();
+  showAlrt('usuarios', id ? `✅ Usuario "${nombre}" actualizado.` : `✅ Usuario "${nombre}" creado.`, 'ok');
 }
 
-function toggleActivo(id) {
-  let users = getUsers();
-  const idx = users.findIndex(u => u.id === id);
-  if (idx !== -1) {
-    users[idx].activo = !users[idx].activo;
-    saveUsers(users);
-    renderUsuarios();
-  }
+async function toggleActivo(id, nuevoEstado) {
+  await db_updateGuia; // dummy - use updateUser
+  await db.collection('usuarios').doc(id).update({ activo: nuevoEstado });
+  await renderUsuarios();
 }
 
-function eliminarUsuario(id) {
+async function eliminarUsuario(id) {
   if (!confirm('¿Eliminar este usuario? No se puede deshacer.')) return;
-  let users = getUsers().filter(u => u.id !== id);
-  saveUsers(users);
-  renderUsuarios();
+  await db_deleteUser(id);
+  await renderUsuarios();
 }
 
 // ═══════════════════════
 // CONFIG
 // ═══════════════════════
-function getCfg() {
-  return JSON.parse(localStorage.getItem('kg_cfg') || '{}');
+let _cfg = {};
+
+async function loadCfg() {
+  _cfg = await db_getCfg();
+  const s = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+  s('ce',  _cfg.emp   || 'TRANSPORTES KAMKE');
+  s('cd',  _cfg.dir   || 'Puerto Varas, Los Lagos');
+  s('ct',  _cfg.tel   || '');
+  s('cops',_cfg.ops   || '');
+  s('cem', _cfg.email || '');
+  s('csvc',_cfg.esvc  || 'service_gl216t6');
+  s('ctpl',_cfg.etpl  || 'template_682vtzc');
+  s('ckey',_cfg.ekey  || 'eGIGxWgojzInGVVdx');
 }
-function loadCfg() {
-  const c = getCfg();
-  document.getElementById('ce').value   = c.emp  || 'TRANSPORTES KAMKE';
-  document.getElementById('cd').value   = c.dir  || 'Puerto Varas, Los Lagos';
-  document.getElementById('ct').value   = c.tel  || '';
-  document.getElementById('cops').value = c.ops  || '';
-  document.getElementById('cem').value  = c.email|| '';
-  document.getElementById('csvc').value = c.esvc || 'service_gl216t6';
-  document.getElementById('ctpl').value = c.etpl || 'template_682vtzc';
-  document.getElementById('ckey').value = c.ekey || 'eGIGxWgojzInGVVdx';
-}
-function saveCfg() {
-  localStorage.setItem('kg_cfg', JSON.stringify({
+
+function getCfg() { return _cfg; }
+
+async function saveCfg() {
+  _cfg = {
     emp:  document.getElementById('ce').value,
     dir:  document.getElementById('cd').value,
     tel:  document.getElementById('ct').value,
@@ -1549,7 +1620,8 @@ function saveCfg() {
     esvc: document.getElementById('csvc').value,
     etpl: document.getElementById('ctpl').value,
     ekey: document.getElementById('ckey').value,
-  }));
+  };
+  await db_saveCfg(_cfg);
 }
 
 // ═══════════════════════
@@ -1558,7 +1630,7 @@ function saveCfg() {
 function showTab(name, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
   document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
-  document.getElementById('tab-' + name).classList.add('on');
+  document.getElementById('tab-'+name).classList.add('on');
   btn.classList.add('on');
   if (name === 'mani') renderMani();
   if (name === 'usuarios') renderUsuarios();
@@ -1577,176 +1649,116 @@ function precio(kg, l, a, h) {
   const ppk = kg * TARIFA_KG;
   const ppv = vm * TARIFA_M3;
   const base = ppk >= ppv ? 'kg' : 'vol';
-  return {
-    vm,
-    ppk: Math.round(ppk),
-    ppv: Math.round(ppv),
-    base,
-    tot: Math.round(TARIFA_FIJA + Math.max(ppk, ppv))
-  };
+  return { vm, ppk:Math.round(ppk), ppv:Math.round(ppv), base, tot:Math.round(TARIFA_FIJA + Math.max(ppk,ppv)) };
 }
-
 function fmt(n) { return '$' + Math.round(n).toLocaleString('es-CL'); }
 
-// Calculadora tab
+// ═══════════════════════
+// CALCULADORA
+// ═══════════════════════
 function calc() {
   const k = +document.getElementById('ck').value || 0;
   const l = +document.getElementById('cl').value || 0;
   const a = +document.getElementById('ca').value || 0;
   const h = +document.getElementById('ch').value || 0;
-
-  // Resaltar campos de medidas vacíos cuando hay peso ingresado
   ['cl','ca','ch'].forEach(id => {
     const el = document.getElementById(id);
     el.style.borderColor = (k > 0 && +el.value <= 0) ? '#f59e0b' : '';
-    el.style.boxShadow  = (k > 0 && +el.value <= 0) ? '0 0 0 3px rgba(245,158,11,.15)' : '';
+    el.style.boxShadow   = (k > 0 && +el.value <= 0) ? '0 0 0 3px rgba(245,158,11,.15)' : '';
   });
-
-  // Alerta en tiempo real
   const alrt = document.getElementById('alrt-calc');
   if (k > 0 && (l <= 0 || a <= 0 || h <= 0)) {
     const faltantes = [];
-    if (l <= 0) faltantes.push('Largo');
-    if (a <= 0) faltantes.push('Ancho');
-    if (h <= 0) faltantes.push('Alto');
-    if (alrt) { alrt.className = 'alert er'; alrt.textContent = '⚠️ Faltan medidas: ' + faltantes.join(', ') + ' (cm) — necesarias para calcular el precio por volumen.'; }
+    if (l<=0) faltantes.push('Largo'); if (a<=0) faltantes.push('Ancho'); if (h<=0) faltantes.push('Alto');
+    if (alrt) { alrt.className='alert er'; alrt.textContent='⚠️ Faltan medidas: '+faltantes.join(', ')+' (cm)'; }
     return;
   }
-  if (k <= 0) {
-    if (alrt) { alrt.className = 'alert in'; alrt.textContent = 'Ingresa el peso y las medidas del bulto para calcular la tarifa.'; }
-    return;
-  }
-  // Todo completo
+  if (k <= 0) { if (alrt) { alrt.className='alert in'; alrt.textContent='Ingresa el peso y las medidas del bulto para calcular.'; } return; }
   if (alrt) alrt.className = 'alert';
-  ['cl','ca','ch'].forEach(id => { document.getElementById(id).style.borderColor = ''; document.getElementById(id).style.boxShadow = ''; });
-
+  ['cl','ca','ch'].forEach(id => { document.getElementById(id).style.borderColor=''; document.getElementById(id).style.boxShadow=''; });
   const p = precio(k, l, a, h);
-  document.getElementById('r_vm').textContent = p.vm.toFixed(4) + ' m³';
+  document.getElementById('r_vm').textContent = p.vm.toFixed(4)+' m³';
   document.getElementById('r_pv').textContent = fmt(p.ppv);
   document.getElementById('r_pk').textContent = fmt(p.ppk);
   document.getElementById('r_tot').textContent = fmt(p.tot);
-  document.getElementById('bdg_v').style.display = p.base === 'vol' ? 'inline' : 'none';
-  document.getElementById('bdg_k').style.display = p.base === 'kg'  ? 'inline' : 'none';
+  document.getElementById('bdg_v').style.display = p.base==='vol' ? 'inline' : 'none';
+  document.getElementById('bdg_k').style.display = p.base==='kg'  ? 'inline' : 'none';
 }
 
-// Guía form calc
 function gCalc() {
-  const k = +document.getElementById('gk').value || 0;
-  const l = +document.getElementById('gl').value || 0;
-  const a = +document.getElementById('ga').value || 0;
-  const h = +document.getElementById('gh').value || 0;
-  const p = precio(k, l, a, h);
-  if (p.base === 'kg') {
-    document.getElementById('gbl').textContent = `Por peso (${k} kg × $${TARIFA_KG})`;
-    document.getElementById('gbv').textContent = fmt(p.ppk);
-  } else {
-    document.getElementById('gbl').textContent = `Por volumen (${p.vm.toFixed(4)} m³ × $${TARIFA_M3.toLocaleString('es-CL')})`;
-    document.getElementById('gbv').textContent = fmt(p.ppv);
-  }
+  const k=+document.getElementById('gk').value||0, l=+document.getElementById('gl').value||0;
+  const a=+document.getElementById('ga').value||0, h=+document.getElementById('gh').value||0;
+  const p = precio(k,l,a,h);
+  document.getElementById('gbl').textContent = p.base==='kg'
+    ? `Por peso (${k} kg × $${TARIFA_KG})`
+    : `Por volumen (${p.vm.toFixed(4)} m³ × $${TARIFA_M3.toLocaleString('es-CL')})`;
+  document.getElementById('gbv').textContent = fmt(p.base==='kg'?p.ppk:p.ppv);
   document.getElementById('gtot').textContent = fmt(p.tot);
 }
 
-// ═══════════════════════
-// PASAR CALC → GUÍA
-// ═══════════════════════
 function pasarAGuia() {
-  const k = document.getElementById('ck').value;
-  const l = document.getElementById('cl').value;
-  const a = document.getElementById('ca').value;
-  const h = document.getElementById('ch').value;
-
-  const faltantes = [];
-  if (!k || +k <= 0) faltantes.push('Peso (kg)');
-  if (!l || +l <= 0) faltantes.push('Largo (cm)');
-  if (!a || +a <= 0) faltantes.push('Ancho (cm)');
-  if (!h || +h <= 0) faltantes.push('Alto (cm)');
-
-  if (faltantes.length > 0) {
-    showAlrt('calc', '❌ Completa todos los campos para continuar: ' + faltantes.join(', '), 'er');
-    return;
-  }
-  // Switch to guía tab
-  const btn = document.querySelectorAll('.nbtn')[1]; // "Nueva Guía" button
+  const k=document.getElementById('ck').value, l=document.getElementById('cl').value;
+  const a=document.getElementById('ca').value, h=document.getElementById('ch').value;
+  const faltantes=[];
+  if (!k||+k<=0) faltantes.push('Peso (kg)'); if (!l||+l<=0) faltantes.push('Largo (cm)');
+  if (!a||+a<=0) faltantes.push('Ancho (cm)'); if (!h||+h<=0) faltantes.push('Alto (cm)');
+  if (faltantes.length>0) { showAlrt('calc','❌ Completa todos los campos: '+faltantes.join(', '),'er'); return; }
+  const btn = document.querySelectorAll('.nbtn')[1];
   showTab('guia', btn);
-  // Fill medidas fields
-  document.getElementById('gk').value = k;
-  document.getElementById('gl').value = l || '';
-  document.getElementById('ga').value = a || '';
-  document.getElementById('gh').value = h || '';
-  // Show badge
+  document.getElementById('gk').value=k; document.getElementById('gl').value=l;
+  document.getElementById('ga').value=a; document.getElementById('gh').value=h;
   document.getElementById('from-calc-badge').classList.add('show');
-  // Trigger price calc
   gCalc();
-  // Scroll to medidas card
-  setTimeout(() => {
-    document.getElementById('gk').scrollIntoView({ behavior:'smooth', block:'center' });
-  }, 150);
+  setTimeout(() => document.getElementById('gk').scrollIntoView({behavior:'smooth',block:'center'}), 150);
 }
 
 function limpiarMedidas() {
-  document.getElementById('gk').value = '';
-  document.getElementById('gl').value = '';
-  document.getElementById('ga').value = '';
-  document.getElementById('gh').value = '';
+  ['gk','gl','ga','gh'].forEach(id => document.getElementById(id).value='');
   document.getElementById('from-calc-badge').classList.remove('show');
-  document.getElementById('gbl').textContent = 'Base de cálculo';
-  document.getElementById('gbv').textContent = '—';
-  document.getElementById('gtot').textContent = '$22.000';
+  document.getElementById('gbl').textContent='Base de cálculo';
+  document.getElementById('gbv').textContent='—';
+  document.getElementById('gtot').textContent='$22.000';
 }
 
 // ═══════════════════════
-// DOC TYPE TOGGLE
+// DOC TYPE
 // ═══════════════════════
 function onDocType(tipo) {
-  const sel = document.getElementById('pago-selector');
-  const alert = document.getElementById('retencion-alert');
-  if (tipo === 'FACTURA') {
-    sel.classList.add('show');
-  } else {
-    sel.classList.remove('show');
-    alert.style.display = 'none';
-    // Reset estado pago to PAGADO for boleta
-    const pagadoRadio = document.querySelector('input[name="estado_pago"][value="PAGADO"]');
-    if (pagadoRadio) pagadoRadio.checked = true;
-  }
+  const sel=document.getElementById('pago-selector'), alrt=document.getElementById('retencion-alert');
+  if (tipo==='FACTURA') { sel.classList.add('show'); }
+  else { sel.classList.remove('show'); alrt.style.display='none';
+    const r=document.querySelector('input[name="estado_pago"][value="PAGADO"]'); if(r) r.checked=true; }
 }
-
-// Watch estado_pago changes
 document.addEventListener('change', function(e) {
-  if (e.target.name === 'estado_pago') {
-    const alert = document.getElementById('retencion-alert');
-    alert.style.display = e.target.value === 'POR PAGAR' ? 'block' : 'none';
+  if (e.target.name==='estado_pago') {
+    document.getElementById('retencion-alert').style.display = e.target.value==='POR PAGAR'?'block':'none';
   }
+  if (e.target.id==='xl-desde'||e.target.id==='xl-hasta') actualizarPreviewExcel();
 });
 
 // ═══════════════════════
-// VALIDACIÓN COMPLETA
+// VALIDACIÓN
 // ═══════════════════════
 function validarFormulario(fd) {
-  const errores = [];
-  // Remitente
-  if (!fd.get('rn')?.trim()) errores.push('Nombre del remitente');
-  if (!fd.get('rr')?.trim()) errores.push('RUT del remitente');
-  if (!fd.get('rd')?.trim()) errores.push('Dirección del remitente');
-  if (!fd.get('rt')?.trim()) errores.push('Teléfono del remitente');
-  // Destinatario
-  if (!fd.get('dn')?.trim()) errores.push('Nombre del destinatario');
-  if (!fd.get('dr')?.trim()) errores.push('RUT del destinatario');
-  if (!fd.get('dd')?.trim()) errores.push('Dirección del destinatario');
-  if (!fd.get('dt')?.trim()) errores.push('Teléfono del destinatario');
-  if (!fd.get('dl')?.trim()) errores.push('Localidad / Ciudad del destinatario');
-  // Envío
-  if (!fd.get('dst')?.trim()) errores.push('Destino');
-  if (!fd.get('cnt')?.trim()) errores.push('Contenido del envío');
-  if (!fd.get('vd') || +fd.get('vd') <= 0) errores.push('Valor declarado');
-  // Medidas
-  if (!fd.get('kg') || +fd.get('kg') <= 0) errores.push('Peso real (kg)');
-  if (!fd.get('gl') || +fd.get('gl') <= 0) errores.push('Largo (cm)');
-  if (!fd.get('ga') || +fd.get('ga') <= 0) errores.push('Ancho (cm)');
-  if (!fd.get('gh') || +fd.get('gh') <= 0) errores.push('Alto (cm)');
-  // Documento
-  if (!fd.get('tipo_doc')) errores.push('Tipo de documento (Boleta/Factura)');
-  return errores;
+  const e=[];
+  if (!fd.get('rn')?.trim()) e.push('Nombre del remitente');
+  if (!fd.get('rr')?.trim()) e.push('RUT del remitente');
+  if (!fd.get('rd')?.trim()) e.push('Dirección del remitente');
+  if (!fd.get('rt')?.trim()) e.push('Teléfono del remitente');
+  if (!fd.get('dn')?.trim()) e.push('Nombre del destinatario');
+  if (!fd.get('dr')?.trim()) e.push('RUT del destinatario');
+  if (!fd.get('dd')?.trim()) e.push('Dirección del destinatario');
+  if (!fd.get('dt')?.trim()) e.push('Teléfono del destinatario');
+  if (!fd.get('dl')?.trim()) e.push('Localidad / Ciudad');
+  if (!fd.get('dst')?.trim()) e.push('Destino');
+  if (!fd.get('cnt')?.trim()) e.push('Contenido del envío');
+  if (!fd.get('vd')||+fd.get('vd')<=0) e.push('Valor declarado');
+  if (!fd.get('kg')||+fd.get('kg')<=0) e.push('Peso real (kg)');
+  if (!fd.get('gl')||+fd.get('gl')<=0) e.push('Largo (cm)');
+  if (!fd.get('ga')||+fd.get('ga')<=0) e.push('Ancho (cm)');
+  if (!fd.get('gh')||+fd.get('gh')<=0) e.push('Alto (cm)');
+  if (!fd.get('tipo_doc')) e.push('Tipo de documento');
+  return e;
 }
 
 // ═══════════════════════
@@ -1754,63 +1766,38 @@ function validarFormulario(fd) {
 // ═══════════════════════
 let guiaActual = null;
 
-function genGuia(e) {
+async function genGuia(e) {
   e.preventDefault();
   const fd = new FormData(document.getElementById('fg'));
-  const c  = getCfg();
-
-  // Validación estricta
   const errores = validarFormulario(fd);
   if (errores.length > 0) {
-    showAlrt('guia', '❌ Campos obligatorios incompletos: ' + errores.join(', '), 'er');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    return;
+    showAlrt('guia','❌ Campos obligatorios incompletos: '+errores.join(', '),'er');
+    window.scrollTo({top:0,behavior:'smooth'}); return;
   }
-
-  const kg = +fd.get('kg') || 0;
-  const l  = +fd.get('gl') || 0;
-  const a  = +fd.get('ga') || 0;
-  const h  = +fd.get('gh') || 0;
-  const p  = precio(kg, l, a, h);
-
-  const tipo_doc    = fd.get('tipo_doc') || 'BOLETA';
-  // Boleta siempre PAGADO; Factura usa el radio seleccionado
-  const estado_pago = tipo_doc === 'BOLETA' ? 'PAGADO' : (fd.get('estado_pago') || 'POR PAGAR');
-
-  const now     = new Date();
+  const kg=+fd.get('kg'), l=+fd.get('gl'), a=+fd.get('ga'), h=+fd.get('gh');
+  const p = precio(kg, l, a, h);
+  const tipo_doc = fd.get('tipo_doc')||'BOLETA';
+  const estado_pago = tipo_doc==='BOLETA' ? 'PAGADO' : (fd.get('estado_pago')||'POR PAGAR');
+  const now = new Date();
   const dateKey = now.toISOString().slice(0,10).replace(/-/g,'');
-  const guias   = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const hoyN    = guias.filter(g => g.id.includes(dateKey)).length;
-  const seq     = String(hoyN + 1).padStart(4,'0');
-  const id      = `KMK-${dateKey}-${seq}`;
-  const nop     = String(Math.floor(Math.random()*900000)+100000);
-
+  const hoyGuias = await db_getGuias(now.toISOString().slice(0,10), now.toISOString().slice(0,10));
+  const seq = String(hoyGuias.length+1).padStart(4,'0');
+  const id = `KMK-${dateKey}-${seq}`;
+  const nop = String(Math.floor(Math.random()*900000)+100000);
+  const c = getCfg();
   const g = {
-    id, nop,
-    fecha: now.toISOString(),
-    rem: { n: fd.get('rn'), r: fd.get('rr')||'—', d: fd.get('rd')||'—', t: fd.get('rt')||'—' },
-    dst: { n: fd.get('dn'), r: fd.get('dr')||'—', d: fd.get('dd'), t: fd.get('dt')||'—', l: fd.get('dl') },
-    ori: fd.get('ori'),
-    des: fd.get('dst'),
-    svc: fd.get('svc'),
-    cnt: fd.get('cnt'),
-    vd:  +fd.get('vd') || 0,
-    obs: fd.get('obs') || '',
-    kg, l, a, h, p,
-    atd: fd.get('atd') || getSession()?.nombre || '—',
-    tipo_doc,
-    estado_pago,
-    fecha_pago: estado_pago === 'PAGADO' ? now.toISOString() : null,
+    id, nop, fecha: now.toISOString(),
+    rem:{ n:fd.get('rn'), r:fd.get('rr'), d:fd.get('rd'), t:fd.get('rt') },
+    dst:{ n:fd.get('dn'), r:fd.get('dr'), d:fd.get('dd'), t:fd.get('dt'), l:fd.get('dl') },
+    ori:fd.get('ori'), des:fd.get('dst'), svc:fd.get('svc'), cnt:fd.get('cnt'),
+    vd:+fd.get('vd')||0, obs:fd.get('obs')||'',
+    kg, l, a, h, p, atd:fd.get('atd')||getSession()?.nombre||'—',
+    tipo_doc, estado_pago, fecha_pago:estado_pago==='PAGADO'?now.toISOString():null,
   };
-
-  guias.push(g);
-  localStorage.setItem('kg_guias', JSON.stringify(guias));
+  await db_saveGuia(g);
   guiaActual = g;
   prepPrint(g);
-
-  // Clear from-calc badge after generating
   document.getElementById('from-calc-badge').classList.remove('show');
-
   document.getElementById('m_id').textContent = id;
   document.getElementById('m_info').innerHTML = `
     <strong>Remitente:</strong> ${g.rem.n}<br>
@@ -1823,176 +1810,87 @@ function genGuia(e) {
 }
 
 // ═══════════════════════
-// PREPARAR IMPRESIÓN
+// PRINT
 // ═══════════════════════
 function prepPrint(g) {
-  const c   = getCfg();
+  const c = getCfg();
   const fch = new Date(g.fecha);
-  const fstr = fch.toLocaleDateString('es-CL') + ' ' + fch.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
-  const dims = (g.l && g.a && g.h) ? `${g.l} × ${g.a} × ${g.h} cm` : '—';
-
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
-
-  set('gp_emp', c.emp || 'TRANSPORTES KAMKE');
-  set('gp_num', g.id);
-  set('gp_rn',  g.rem.n); set('gp_rr', g.rem.r); set('gp_rd', g.rem.d); set('gp_rt', g.rem.t);
-  set('gp_dn',  g.dst.n); set('gp_dr', g.dst.r); set('gp_dd', g.dst.d); set('gp_dt', g.dst.t); set('gp_dl', g.dst.l);
-  set('gp_ori', g.ori);
-  set('gp_dst', g.des);
-  set('gp_svc', g.svc || 'ESTÁNDAR');
-  set('gp_cnt', g.cnt);
-  set('gp_kk',  g.kg + ' kg');
-  set('gp_vm',  g.p.vm.toFixed(4) + ' m³');
-  set('gp_dim', dims);
-  set('gp_vd',  g.vd ? fmt(g.vd) : '—');
-  set('gp_prc', fmt(g.p.tot));
-  set('gp_fch', fstr);
-  set('gp_atd', g.atd);
-  set('gp_nop', g.nop);
-  set('gp_tel_footer', c.tel ? 'Contacto: ' + c.tel : '');
-
-  // Doc badge
-  const docBadge = document.getElementById('gp_doc_badge');
-  if (docBadge) {
-    docBadge.textContent = g.tipo_doc || 'BOLETA';
-    docBadge.style.background = g.estado_pago === 'POR PAGAR' ? '#f59e0b' : 'rgba(255,255,255,.15)';
-  }
-
-  const obsRow = document.getElementById('gp_obs_row');
-  if (g.obs) {
-    set('gp_obs', g.obs);
-    if (obsRow) obsRow.style.display = 'flex';
-  } else {
-    if (obsRow) obsRow.style.display = 'none';
-  }
-
-  set('gp_bcn', g.id);
-  try {
-    JsBarcode('#gp_bc', g.id, { format:'CODE128', width:2, height:48, displayValue:false, background:'#fff', lineColor:'#000' });
-  } catch(_) {}
+  const fstr = fch.toLocaleDateString('es-CL')+' '+fch.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+  const dims = (g.l&&g.a&&g.h) ? `${g.l} × ${g.a} × ${g.h} cm` : '—';
+  const set = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=val||'—'; };
+  set('gp_emp', c.emp||'TRANSPORTES KAMKE'); set('gp_num', g.id);
+  set('gp_rn',g.rem.n); set('gp_rr',g.rem.r); set('gp_rd',g.rem.d); set('gp_rt',g.rem.t);
+  set('gp_dn',g.dst.n); set('gp_dr',g.dst.r); set('gp_dd',g.dst.d); set('gp_dt',g.dst.t); set('gp_dl',g.dst.l);
+  set('gp_ori',g.ori); set('gp_dst',g.des); set('gp_svc',g.svc||'ESTÁNDAR'); set('gp_cnt',g.cnt);
+  set('gp_kk',g.kg+' kg'); set('gp_vm',g.p.vm.toFixed(4)+' m³'); set('gp_dim',dims);
+  set('gp_vd',g.vd?fmt(g.vd):'—'); set('gp_prc',fmt(g.p.tot)); set('gp_fch',fstr);
+  set('gp_atd',g.atd); set('gp_nop',g.nop); set('gp_tel_footer',c.tel?'Contacto: '+c.tel:'');
+  const docBadge=document.getElementById('gp_doc_badge');
+  if (docBadge) { docBadge.textContent=g.tipo_doc||'BOLETA'; docBadge.style.background=g.estado_pago==='POR PAGAR'?'#f59e0b':'rgba(255,255,255,.15)'; }
+  const obsRow=document.getElementById('gp_obs_row');
+  if (g.obs) { set('gp_obs',g.obs); if(obsRow) obsRow.style.display='flex'; } else { if(obsRow) obsRow.style.display='none'; }
+  set('gp_bcn',g.id);
+  try { JsBarcode('#gp_bc',g.id,{format:'CODE128',width:2,height:48,displayValue:false,background:'#fff',lineColor:'#000'}); } catch(_) {}
 }
 
-function printGuia() {
-  closeModal();
-  setTimeout(() => window.print(), 150);
-}
-
-function printMani() {
-  alert('Para imprimir el manifesto usa Ctrl+P (Cmd+P en Mac). Asegúrate de seleccionar "Guardar como PDF" o tu impresora.');
-}
+function printGuia() { closeModal(); setTimeout(()=>window.print(),150); }
+function printMani() { alert('Usa Ctrl+P para imprimir el manifesto.'); }
 
 // ═══════════════════════
 // MANIFESTO
 // ═══════════════════════
+let maniListener = null;
+
 function renderMani() {
-  const fecha  = document.getElementById('fdate').value;
-  const guias  = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const items  = guias.filter(g => g.fecha.startsWith(fecha));
-  const totKg  = items.reduce((s,g) => s + (g.kg||0), 0);
-  const totCob = items.reduce((s,g) => s + (g.p?.tot||0), 0);
-  const pendientes = items.filter(g => g.estado_pago === 'POR PAGAR');
-  const totPend = pendientes.reduce((s,g) => s + (g.p?.tot||0), 0);
-
-  document.getElementById('sct').textContent  = items.length;
-  document.getElementById('skg').textContent  = totKg.toFixed(1);
-  document.getElementById('stot').textContent = fmt(totCob);
-  document.getElementById('sfact').textContent = pendientes.length;
-  document.getElementById('spend').textContent = fmt(totPend);
-
-  const tbl = document.getElementById('mtbl');
-  if (!items.length) {
-    tbl.innerHTML = `<div style="text-align:center;padding:48px 20px;color:var(--g400);">
-      <div style="font-size:52px;margin-bottom:12px;">📦</div>
-      <div style="font-family:var(--cond);font-size:17px;font-weight:700;">Sin guías para esta fecha</div>
-      <div style="font-size:13px;margin-top:6px;">Crea una nueva guía en la pestaña 📦 Nueva Guía</div>
-    </div>`;
-    return;
-  }
-
-  // Warning banner if there are pending invoices
-  const pendWarning = pendientes.length > 0
-    ? `<div style="padding:10px 14px;background:#fef3c7;border-bottom:2px solid #f59e0b;font-size:13px;color:#92400e;font-weight:600;">
-        ⚠️ ${pendientes.length} factura(s) POR PAGAR · Monto retenido: ${fmt(totPend)} — La carga NO se entrega hasta confirmar el pago.
-      </div>`
-    : '';
-
-  const rows = items.map(g => {
-    const hora = new Date(g.fecha).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
-    const docBadge = g.tipo_doc === 'FACTURA'
-      ? `<span class="badge-factura">📄 FACT</span>`
-      : `<span class="badge-boleta">🧾 BOL</span>`;
-    const pagoBadge = g.estado_pago === 'POR PAGAR'
-      ? `<span class="badge-pendiente">⏳ POR PAGAR</span>`
-      : `<span class="badge-pagado">✅ PAGADO</span>`;
-    const pagarBtn = g.estado_pago === 'POR PAGAR'
-      ? `<button class="ab" style="color:var(--green);margin-right:4px;" onclick="marcarPagado('${g.id}')">💰 Pagar</button>`
-      : '';
-    const rowClass = g.estado_pago === 'POR PAGAR' ? ' class="por-pagar"' : '';
-    return `<tr${rowClass}>
-      <td class="mc" style="font-weight:700;color:var(--navy);">${g.id}</td>
-      <td style="color:var(--g400);font-size:12px;">${hora}</td>
-      <td>${g.rem.n}</td>
-      <td>${g.dst.n}</td>
-      <td><span class="dtag">📍 ${g.des}</span></td>
-      <td class="mc">${g.kg} kg</td>
-      <td>${docBadge}</td>
-      <td>${pagoBadge}</td>
-      <td class="mc" style="font-weight:700;color:var(--navy);">${fmt(g.p?.tot||0)}</td>
-      <td>
-        ${pagarBtn}
-        <button class="ab view" onclick="verG('${g.id}')">Ver</button>
-        &nbsp;
-        <button class="ab del" onclick="delG('${g.id}')">Eliminar</button>
-      </td>
-    </tr>`;
-  }).join('');
-
-  tbl.innerHTML = `${pendWarning}<table>
-    <thead><tr>
-      <th>N° Guía</th><th>Hora</th><th>Remitente</th>
-      <th>Destinatario</th><th>Destino</th><th>Peso</th>
-      <th>Doc.</th><th>Pago</th><th>Total</th><th>Acciones</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  const fecha = document.getElementById('fdate').value;
+  if (maniListener) { maniListener(); maniListener = null; }
+  maniListener = db_listenMani(fecha, fecha, items => {
+    const totKg   = items.reduce((s,g)=>s+(g.kg||0),0);
+    const totCob  = items.reduce((s,g)=>s+(g.p?.tot||0),0);
+    const pend    = items.filter(g=>g.estado_pago==='POR PAGAR');
+    const totPend = pend.reduce((s,g)=>s+(g.p?.tot||0),0);
+    document.getElementById('sct').textContent  = items.length;
+    document.getElementById('skg').textContent  = totKg.toFixed(1);
+    document.getElementById('stot').textContent = fmt(totCob);
+    document.getElementById('sfact').textContent= pend.length;
+    document.getElementById('spend').textContent= fmt(totPend);
+    const tbl = document.getElementById('mtbl');
+    if (!items.length) {
+      tbl.innerHTML=`<div style="text-align:center;padding:48px 20px;color:var(--g400);"><div style="font-size:52px;margin-bottom:12px;">📦</div><div style="font-family:var(--cond);font-size:17px;font-weight:700;">Sin guías para esta fecha</div></div>`;
+      return;
+    }
+    const pw = pend.length>0?`<div style="padding:10px 14px;background:#fef3c7;border-bottom:2px solid #f59e0b;font-size:13px;color:#92400e;font-weight:600;">⚠️ ${pend.length} factura(s) POR PAGAR · Monto retenido: ${fmt(totPend)}</div>`:'';
+    const rows = items.map(g=>{
+      const hora=new Date(g.fecha).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+      const docB=g.tipo_doc==='FACTURA'?'<span class="badge-factura">📄 FACT</span>':'<span class="badge-boleta">🧾 BOL</span>';
+      const pagB=g.estado_pago==='POR PAGAR'?'<span class="badge-pendiente">⏳ POR PAGAR</span>':'<span class="badge-pagado">✅ PAGADO</span>';
+      const pagarBtn=g.estado_pago==='POR PAGAR'?`<button class="ab" style="color:var(--green);margin-right:4px;" onclick="marcarPagado('${g.id}')">💰 Pagar</button>`:'';
+      const rc=g.estado_pago==='POR PAGAR'?' class="por-pagar"':'';
+      return `<tr${rc}><td class="mc" style="font-weight:700;color:var(--navy);">${g.id}</td><td style="color:var(--g400);font-size:12px;">${hora}</td><td>${g.rem.n}</td><td>${g.dst.n}</td><td><span class="dtag">📍 ${g.des}</span></td><td class="mc">${g.kg} kg</td><td>${docB}</td><td>${pagB}</td><td class="mc" style="font-weight:700;color:var(--navy);">${fmt(g.p?.tot||0)}</td><td>${pagarBtn}<button class="ab view" onclick="verG('${g.id}')">Ver</button> &nbsp; <button class="ab del" onclick="delG('${g.id}')">Eliminar</button></td></tr>`;
+    }).join('');
+    tbl.innerHTML=`${pw}<table><thead><tr><th>N° Guía</th><th>Hora</th><th>Remitente</th><th>Destinatario</th><th>Destino</th><th>Peso</th><th>Doc.</th><th>Pago</th><th>Total</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table>`;
+  });
 }
 
-function marcarPagado(id) {
-  if (!confirm('¿Confirmar pago de esta factura? Se marcará como PAGADO y la carga podrá ser entregada.')) return;
-  let guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const idx = guias.findIndex(g => g.id === id);
-  if (idx !== -1) {
-    guias[idx].estado_pago = 'PAGADO';
-    guias[idx].fecha_pago = new Date().toISOString();
-    localStorage.setItem('kg_guias', JSON.stringify(guias));
-    showAlrt('mani', `✅ Guía ${id} marcada como PAGADO. La carga puede entregarse.`, 'ok');
-    renderMani();
-  }
-}
-
-function verG(id) {
-  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const g = guias.find(x => x.id === id);
-  if (!g) return;
-  guiaActual = g;
-  prepPrint(g);
+async function verG(id) {
+  const snap = await db.collection('guias').doc(id).get();
+  if (!snap.exists) return;
+  const g = snap.data();
+  guiaActual = g; prepPrint(g);
   document.getElementById('m_id').textContent = g.id;
-  document.getElementById('m_info').innerHTML = `
-    <strong>Remitente:</strong> ${g.rem.n}<br>
-    <strong>Destinatario:</strong> ${g.dst.n}<br>
-    <strong>Ruta:</strong> ${g.ori} → ${g.des} (${g.dst.l})<br>
-    <strong>Peso:</strong> ${g.kg} kg<br>
-    <div style="font-size:18px;font-weight:700;color:var(--orange);margin-top:6px;">TOTAL: ${fmt(g.p?.tot||0)}</div>
-  `;
+  document.getElementById('m_info').innerHTML = `<strong>Remitente:</strong> ${g.rem.n}<br><strong>Destinatario:</strong> ${g.dst.n}<br><strong>Ruta:</strong> ${g.ori} → ${g.des} (${g.dst.l})<br><strong>Peso:</strong> ${g.kg} kg<br><div style="font-size:18px;font-weight:700;color:var(--orange);margin-top:6px;">TOTAL: ${fmt(g.p?.tot||0)}</div>`;
   document.getElementById('modal').classList.add('on');
 }
 
-function delG(id) {
+async function delG(id) {
   if (!confirm('¿Eliminar esta guía? No se puede deshacer.')) return;
-  let guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  guias = guias.filter(g => g.id !== id);
-  localStorage.setItem('kg_guias', JSON.stringify(guias));
-  renderMani();
+  await db_deleteGuia(id);
+}
+
+async function marcarPagado(id) {
+  if (!confirm('¿Confirmar pago de esta factura?')) return;
+  await db_updateGuia(id, { estado_pago:'PAGADO', fecha_pago:new Date().toISOString() });
+  showAlrt('mani',`✅ Guía ${id} marcada como PAGADO.`,'ok');
 }
 
 // ═══════════════════════
@@ -2000,125 +1898,41 @@ function delG(id) {
 // ═══════════════════════
 async function sendReport() {
   const c = getCfg();
-  if (!c.email) {
-    showAlrt('mani', '⚠ Configura el email de destino en la pestaña ⚙️ Config', 'er');
-    return;
-  }
-
-  const fecha  = document.getElementById('fdate').value;
-  const guias  = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const items  = guias.filter(g => g.fecha.startsWith(fecha));
-
-  if (!items.length) {
-    showAlrt('mani', 'No hay guías para enviar en esta fecha.', 'in');
-    return;
-  }
-
-  const totCob = items.reduce((s,g) => s + (g.p?.tot||0), 0);
-  const totKg  = items.reduce((s,g) => s + (g.kg||0), 0);
-  const pendientes = items.filter(g => g.estado_pago === 'POR PAGAR');
-  const totPend = pendientes.reduce((s,g) => s + (g.p?.tot||0), 0);
-  const fDisplay = new Date(fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-
-  const detalle = items.map((g,i) =>
-    `${i+1}. [${g.id}] ${g.rem.n} → ${g.dst.n} | ${g.des} | ${g.kg}kg | ${fmt(g.p?.tot||0)} | ${g.tipo_doc||'BOLETA'} | ${g.estado_pago||'PAGADO'}`
-  ).join('\n');
-
-  const pendDetalle = pendientes.length > 0
-    ? `\n⚠️ FACTURAS PENDIENTES DE COBRO:\n` + pendientes.map(g => `  - [${g.id}] ${g.dst.n} · ${g.des} · ${fmt(g.p?.tot||0)}`).join('\n')
-    : '';
-
-  const msg = `REPORTE DIARIO — ${c.emp || 'TRANSPORTES KAMKE'}
-Fecha: ${fDisplay}
-
-RESUMEN:
-  • Total guías:              ${items.length}
-  • Kg despachados:           ${totKg.toFixed(1)} kg
-  • Total cobrado:            ${fmt(totCob - totPend)}
-  • Facturas pendientes:      ${pendientes.length} (${fmt(totPend)})
-${pendDetalle}
-
-DETALLE DE GUÍAS:
-${detalle}
-
----
-Generado automáticamente por KamkeCargo System`;
-
-  try {
-    emailjs.init(c.ekey || 'eGIGxWgojzInGVVdx');
-    await emailjs.send(
-      c.esvc || 'service_gl216t6',
-      c.etpl || 'template_682vtzc',
-      {
-        to_email: c.email,
-        subject:  `Reporte Guías ${fecha} — ${c.emp || 'TRANSPORTES KAMKE'}`,
-        message:  msg,
-        empresa:  c.emp || 'TRANSPORTES KAMKE',
-        fecha:    fDisplay,
-      }
-    );
-    showAlrt('mani', `✅ Reporte enviado a ${c.email}`, 'ok');
-  } catch(err) {
-    console.error(err);
-    showAlrt('mani', `❌ Error: ${err?.text || err?.message || 'Revisa la configuración de EmailJS'}`, 'er');
-  }
-}
-
-// ═══════════════════════
-// UTILS
-// ═══════════════════════
-function showAlrt(zone, msg, type) {
-  const el = document.getElementById('alrt-' + zone);
-  if (!el) return;
-  el.className = 'alert ' + type;
-  el.textContent = msg;
-  setTimeout(() => el.className = 'alert', 7000);
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.remove('on');
-}
-
-document.getElementById('modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
-
-function resetFg() {
-  document.getElementById('fg').reset();
-  const session = getSession();
-  document.getElementById('atd').value = session?.nombre || '';
-  document.getElementById('from-calc-badge').classList.remove('show');
-  document.getElementById('gbl').textContent = 'Base de cálculo';
-  document.getElementById('gbv').textContent = '—';
-  document.getElementById('gtot').textContent = '$22.000';
-}
-
-function fmtRut(inp) {
-  let v = inp.value.replace(/[^0-9kK]/g,'');
-  if (v.length > 1) {
-    const dv = v.slice(-1).toUpperCase();
-    const num = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-    v = num + '-' + dv;
-  }
-  inp.value = v;
-}
-
-// ═══════════════════════
-// EXPORTAR EXCEL
-// ═══════════════════════
-function exportarExcelDia() {
+  if (!c.email) { showAlrt('mani','⚠ Configura el email de destino en ⚙️ Config','er'); return; }
   const fecha = document.getElementById('fdate').value;
-  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const items = guias.filter(g => g.fecha.startsWith(fecha));
-  if (!items.length) { showAlrt('mani', 'No hay guías para exportar en esta fecha.', 'in'); return; }
-  const wb = crearWorkbook(items, `Guías ${fecha}`, fecha, fecha);
+  const items = await db_getGuias(fecha, fecha);
+  if (!items.length) { showAlrt('mani','No hay guías para enviar.','in'); return; }
+  const totCob  = items.reduce((s,g)=>s+(g.p?.tot||0),0);
+  const totKg   = items.reduce((s,g)=>s+(g.kg||0),0);
+  const pend    = items.filter(g=>g.estado_pago==='POR PAGAR');
+  const totPend = pend.reduce((s,g)=>s+(g.p?.tot||0),0);
+  const fDisplay= new Date(fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const detalle = items.map((g,i)=>`${i+1}. [${g.id}] ${g.rem.n} → ${g.dst.n} | ${g.des} | ${g.kg}kg | ${fmt(g.p?.tot||0)} | ${g.tipo_doc||'BOLETA'} | ${g.estado_pago||'PAGADO'}`).join('\n');
+  const pendDet = pend.length>0 ? `\n⚠️ FACTURAS PENDIENTES:\n`+pend.map(g=>`  - [${g.id}] ${g.dst.n} · ${g.des} · ${fmt(g.p?.tot||0)}`).join('\n') : '';
+  const msg = `REPORTE DIARIO — ${c.emp||'TRANSPORTES KAMKE'}\nFecha: ${fDisplay}\n\nRESUMEN:\n  • Total guías: ${items.length}\n  • Kg despachados: ${totKg.toFixed(1)} kg\n  • Total cobrado: ${fmt(totCob-totPend)}\n  • Facturas pendientes: ${pend.length} (${fmt(totPend)})\n${pendDet}\n\nDETALLE:\n${detalle}\n\n---\nKamkeCargo System`;
+  try {
+    emailjs.init(c.ekey||'eGIGxWgojzInGVVdx');
+    await emailjs.send(c.esvc||'service_gl216t6', c.etpl||'template_682vtzc', { to_email:c.email, subject:`Reporte ${fecha} — ${c.emp||'TRANSPORTES KAMKE'}`, message:msg, empresa:c.emp||'TRANSPORTES KAMKE', fecha:fDisplay });
+    showAlrt('mani',`✅ Reporte enviado a ${c.email}`,'ok');
+  } catch(err) { showAlrt('mani',`❌ Error: ${err?.text||err?.message||'Revisa la config de EmailJS'}`,'er'); }
+}
+
+// ═══════════════════════
+// EXCEL EXPORT
+// ═══════════════════════
+async function exportarExcelDia() {
+  const fecha = document.getElementById('fdate').value;
+  const items = await db_getGuias(fecha, fecha);
+  if (!items.length) { showAlrt('mani','No hay guías para exportar.','in'); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, crearHojaDetalle(items), 'Detalle Guías');
+  XLSX.utils.book_append_sheet(wb, crearHojaResumen(items, fecha, fecha), 'Resumen');
   XLSX.writeFile(wb, `KamkeCargo_${fecha}.xlsx`);
 }
 
 function abrirModalExcel() {
   const hoy = new Date().toISOString().slice(0,10);
-  const primerDiaMes = hoy.slice(0,8) + '01';
-  document.getElementById('xl-desde').value = primerDiaMes;
+  document.getElementById('xl-desde').value = hoy.slice(0,8)+'01';
   document.getElementById('xl-hasta').value = hoy;
   document.getElementById('xl-tipo').value = 'ambos';
   document.getElementById('xl-inc-pagados').checked = true;
@@ -2127,202 +1941,101 @@ function abrirModalExcel() {
   document.getElementById('modal-excel').classList.add('on');
 }
 
-function actualizarPreviewExcel() {
-  const desde = document.getElementById('xl-desde').value;
-  const hasta = document.getElementById('xl-hasta').value;
-  if (!desde || !hasta) return;
-  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const items = filtrarGuiasExcel(guias, desde, hasta);
-  const preview = document.getElementById('xl-preview');
-  preview.style.display = 'block';
-  preview.innerHTML = `Se exportarán <strong>${items.length} guías</strong> del ${desde} al ${hasta} · Total: <strong>${fmt(items.reduce((s,g)=>s+(g.p?.tot||0),0))}</strong>`;
+async function actualizarPreviewExcel() {
+  const desde=document.getElementById('xl-desde').value, hasta=document.getElementById('xl-hasta').value;
+  if (!desde||!hasta) return;
+  const items = await db_getGuias(desde, hasta);
+  const f = filtrarItems(items);
+  const prev=document.getElementById('xl-preview');
+  prev.style.display='block';
+  prev.innerHTML=`Se exportarán <strong>${f.length} guías</strong> del ${desde} al ${hasta} · Total: <strong>${fmt(f.reduce((s,g)=>s+(g.p?.tot||0),0))}</strong>`;
 }
 
-// Listen for date changes
-document.addEventListener('change', function(e) {
-  if (e.target.id === 'xl-desde' || e.target.id === 'xl-hasta') actualizarPreviewExcel();
-});
-
-function filtrarGuiasExcel(guias, desde, hasta) {
-  const incPag  = document.getElementById('xl-inc-pagados')?.checked !== false;
-  const incPend = document.getElementById('xl-inc-pendientes')?.checked !== false;
-  return guias.filter(g => {
-    const fecha = g.fecha.slice(0,10);
-    if (fecha < desde || fecha > hasta) return false;
-    if (!incPend && g.estado_pago === 'POR PAGAR') return false;
-    if (!incPag  && g.estado_pago !== 'POR PAGAR') return false;
+function filtrarItems(items) {
+  const incPag  = document.getElementById('xl-inc-pagados')?.checked!==false;
+  const incPend = document.getElementById('xl-inc-pendientes')?.checked!==false;
+  return items.filter(g => {
+    if (!incPend && g.estado_pago==='POR PAGAR') return false;
+    if (!incPag  && g.estado_pago!=='POR PAGAR') return false;
     return true;
   });
 }
 
-function generarExcel() {
-  const desde = document.getElementById('xl-desde').value;
-  const hasta = document.getElementById('xl-hasta').value;
-  const tipo  = document.getElementById('xl-tipo').value;
-  if (!desde || !hasta) { alert('Selecciona el rango de fechas.'); return; }
-
-  const guias = JSON.parse(localStorage.getItem('kg_guias') || '[]');
-  const items = filtrarGuiasExcel(guias, desde, hasta);
+async function generarExcel() {
+  const desde=document.getElementById('xl-desde').value, hasta=document.getElementById('xl-hasta').value;
+  const tipo=document.getElementById('xl-tipo').value;
+  if (!desde||!hasta) { alert('Selecciona el rango de fechas.'); return; }
+  const allItems = await db_getGuias(desde, hasta);
+  const items = filtrarItems(allItems);
   if (!items.length) { alert('No hay guías en el rango seleccionado.'); return; }
-
   const wb = XLSX.utils.book_new();
-  const nombreArchivo = `KamkeCargo_${desde}_${hasta}`;
-
-  if (tipo === 'detalle' || tipo === 'ambos') {
-    const wsDetalle = crearHojaDetalle(items);
-    XLSX.utils.book_append_sheet(wb, wsDetalle, 'Detalle Guías');
-  }
-  if (tipo === 'resumen' || tipo === 'ambos') {
-    const wsResumen = crearHojaResumen(items, desde, hasta);
-    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen por Día');
-  }
-  if (tipo === 'pendientes') {
-    const pend = items.filter(g => g.estado_pago === 'POR PAGAR');
-    const wsPend = crearHojaDetalle(pend, true);
-    XLSX.utils.book_append_sheet(wb, wsPend, 'Facturas Pendientes');
-  }
-
-  XLSX.writeFile(wb, `${nombreArchivo}.xlsx`);
+  if (tipo==='detalle'||tipo==='ambos') XLSX.utils.book_append_sheet(wb, crearHojaDetalle(items), 'Detalle Guías');
+  if (tipo==='resumen'||tipo==='ambos') XLSX.utils.book_append_sheet(wb, crearHojaResumen(items, desde, hasta), 'Resumen por Día');
+  if (tipo==='pendientes') XLSX.utils.book_append_sheet(wb, crearHojaDetalle(items.filter(g=>g.estado_pago==='POR PAGAR'),true), 'Facturas Pendientes');
+  XLSX.writeFile(wb, `KamkeCargo_${desde}_${hasta}.xlsx`);
   document.getElementById('modal-excel').classList.remove('on');
-  showAlrt('mani', `✅ Excel descargado: ${items.length} guías exportadas.`, 'ok');
+  showAlrt('mani',`✅ Excel descargado: ${items.length} guías.`,'ok');
 }
 
-function crearWorkbook(items, titulo, desde, hasta) {
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, crearHojaDetalle(items), 'Detalle Guías');
-  XLSX.utils.book_append_sheet(wb, crearHojaResumen(items, desde, hasta), 'Resumen por Día');
-  return wb;
-}
-
-function crearHojaDetalle(items, esPendientes = false) {
-  const cfg = getCfg();
-
-  const headers = [
-    'N° Guía', 'Fecha', 'Hora', 'Origen', 'Destino',
-    'Remitente', 'RUT Remitente', 'Dir. Remitente', 'Tel. Remitente',
-    'Destinatario', 'RUT Destinatario', 'Dir. Destinatario', 'Tel. Destinatario', 'Localidad',
-    'Contenido', 'Peso Kg', 'Volumen m³', 'Dimensiones',
-    'Valor Declarado', 'Tipo Documento', 'Estado Pago', 'Total a Cobrar',
-    'Atendido Por'
-  ];
-
-  const rows = items.map(g => {
-    const fch = new Date(g.fecha);
-    return [
-      g.id,
-      fch.toLocaleDateString('es-CL'),
-      fch.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'}),
-      g.ori, g.des,
-      g.rem.n, g.rem.r, g.rem.d, g.rem.t,
-      g.dst.n, g.dst.r, g.dst.d, g.dst.t, g.dst.l,
-      g.cnt,
-      g.kg,
-      +(g.p?.vm||0).toFixed(4),
-      (g.l && g.a && g.h) ? `${g.l}×${g.a}×${g.h} cm` : '—',
-      g.vd || 0,
-      g.tipo_doc || 'BOLETA',
-      g.estado_pago || 'PAGADO',
-      g.p?.tot || 0,
-      g.atd
-    ];
+function crearHojaDetalle(items, esPend=false) {
+  const c=getCfg();
+  const headers=['N° Guía','Fecha','Hora','Origen','Destino','Remitente','RUT Rem.','Dir. Rem.','Tel. Rem.','Destinatario','RUT Dest.','Dir. Dest.','Tel. Dest.','Localidad','Contenido','Peso Kg','Volumen m³','Dimensiones','Valor Decl.','Tipo Doc.','Estado Pago','Total','Operador'];
+  const rows=items.map(g=>{
+    const fch=new Date(g.fecha);
+    return [g.id,fch.toLocaleDateString('es-CL'),fch.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}),g.ori,g.des,g.rem.n,g.rem.r,g.rem.d,g.rem.t,g.dst.n,g.dst.r,g.dst.d,g.dst.t,g.dst.l,g.cnt,g.kg,+(g.p?.vm||0).toFixed(4),(g.l&&g.a&&g.h)?`${g.l}×${g.a}×${g.h} cm`:'—',g.vd||0,g.tipo_doc||'BOLETA',g.estado_pago||'PAGADO',g.p?.tot||0,g.atd];
   });
-
-  // Add totals row
-  const totalPeso = items.reduce((s,g) => s+(g.kg||0), 0);
-  const totalCobrar = items.reduce((s,g) => s+(g.p?.tot||0), 0);
-  const totals = ['', '', '', '', 'TOTAL', '', '', '', '', '', '', '', '', '',
-    '', totalPeso, '', '', '', '', '', totalCobrar, ''];
-
-  const data = [
-    [`REPORTE ${esPendientes ? 'FACTURAS PENDIENTES' : 'DETALLE DE GUÍAS'} — ${cfg.emp || 'TRANSPORTES KAMKE'}`],
-    [`Generado: ${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'})}`],
-    [],
-    headers,
-    ...rows,
-    [],
-    totals
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-
-  // Column widths
-  ws['!cols'] = [
-    {wch:18},{wch:11},{wch:7},{wch:14},{wch:16},
-    {wch:22},{wch:14},{wch:20},{wch:14},
-    {wch:22},{wch:14},{wch:20},{wch:14},{wch:16},
-    {wch:18},{wch:9},{wch:11},{wch:16},
-    {wch:14},{wch:12},{wch:12},{wch:14},
-    {wch:18}
-  ];
-
+  const totPeso=items.reduce((s,g)=>s+(g.kg||0),0), totCob=items.reduce((s,g)=>s+(g.p?.tot||0),0);
+  const ws=XLSX.utils.aoa_to_sheet([[`REPORTE ${esPend?'FACTURAS PENDIENTES':'DETALLE'} — ${c.emp||'TRANSPORTES KAMKE'}`],[`Generado: ${new Date().toLocaleDateString('es-CL')}`],[],headers,...rows,[],['','','','','TOTAL','','','','','','','','','','',totPeso,'','','','','',totCob,'']]);
+  ws['!cols']=[{wch:18},{wch:11},{wch:7},{wch:14},{wch:16},{wch:22},{wch:14},{wch:20},{wch:14},{wch:22},{wch:14},{wch:20},{wch:14},{wch:16},{wch:18},{wch:9},{wch:11},{wch:16},{wch:14},{wch:12},{wch:12},{wch:14},{wch:18}];
   return ws;
 }
 
 function crearHojaResumen(items, desde, hasta) {
-  const cfg = getCfg();
-
-  // Group by date
-  const porFecha = {};
-  items.forEach(g => {
-    const fecha = g.fecha.slice(0,10);
-    if (!porFecha[fecha]) porFecha[fecha] = [];
-    porFecha[fecha].push(g);
+  const c=getCfg();
+  const porF={};
+  items.forEach(g=>{ const f=g.fecha.slice(0,10); if(!porF[f]) porF[f]=[]; porF[f].push(g); });
+  const headers=['Fecha','N° Guías','Kg Total','Boletas','Fact. Pagadas','Fact. Pendientes','Total Cobrado','Monto Pend.','Total General'];
+  const rows=Object.keys(porF).sort().map(f=>{
+    const gs=porF[f];
+    return [new Date(f+'T12:00:00').toLocaleDateString('es-CL'),gs.length,+gs.reduce((s,g)=>s+(g.kg||0),0).toFixed(1),gs.filter(g=>g.tipo_doc!=='FACTURA').length,gs.filter(g=>g.tipo_doc==='FACTURA'&&g.estado_pago==='PAGADO').length,gs.filter(g=>g.estado_pago==='POR PAGAR').length,gs.filter(g=>g.estado_pago!=='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0),gs.filter(g=>g.estado_pago==='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0),gs.reduce((s,g)=>s+(g.p?.tot||0),0)];
   });
-
-  const headers = ['Fecha', 'N° Guías', 'Kg Total', 'Boletas', 'Facturas Pagadas', 'Facturas Pendientes', 'Total Cobrado', 'Monto Pendiente', 'Total General'];
-
-  const rows = Object.keys(porFecha).sort().map(fecha => {
-    const gs = porFecha[fecha];
-    const boletas   = gs.filter(g => g.tipo_doc !== 'FACTURA').length;
-    const factPag   = gs.filter(g => g.tipo_doc === 'FACTURA' && g.estado_pago === 'PAGADO').length;
-    const factPend  = gs.filter(g => g.estado_pago === 'POR PAGAR').length;
-    const totKg     = gs.reduce((s,g) => s+(g.kg||0), 0);
-    const totCob    = gs.filter(g=>g.estado_pago!=='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
-    const totPend   = gs.filter(g=>g.estado_pago==='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
-    const totGen    = gs.reduce((s,g)=>s+(g.p?.tot||0),0);
-    return [
-      new Date(fecha+'T12:00:00').toLocaleDateString('es-CL'),
-      gs.length, +totKg.toFixed(1),
-      boletas, factPag, factPend,
-      totCob, totPend, totGen
-    ];
-  });
-
-  // Grand totals
-  const gtKg    = items.reduce((s,g)=>s+(g.kg||0),0);
-  const gtCob   = items.filter(g=>g.estado_pago!=='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
-  const gtPend  = items.filter(g=>g.estado_pago==='POR PAGAR').reduce((s,g)=>s+(g.p?.tot||0),0);
-  const gtGen   = items.reduce((s,g)=>s+(g.p?.tot||0),0);
-  const totRow  = ['TOTAL', items.length, +gtKg.toFixed(1),
-    items.filter(g=>g.tipo_doc!=='FACTURA').length,
-    items.filter(g=>g.tipo_doc==='FACTURA'&&g.estado_pago==='PAGADO').length,
-    items.filter(g=>g.estado_pago==='POR PAGAR').length,
-    gtCob, gtPend, gtGen];
-
-  const data = [
-    [`RESUMEN POR DÍA — ${cfg.emp || 'TRANSPORTES KAMKE'}`],
-    [`Período: ${desde} al ${hasta}  |  Generado: ${new Date().toLocaleDateString('es-CL')}`],
-    [],
-    headers,
-    ...rows,
-    [],
-    totRow
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [
-    {wch:13},{wch:10},{wch:10},{wch:10},{wch:16},{wch:18},{wch:16},{wch:16},{wch:14}
-  ];
+  const ws=XLSX.utils.aoa_to_sheet([[`RESUMEN POR DÍA — ${c.emp||'TRANSPORTES KAMKE'}`],[`Período: ${desde} al ${hasta}`],[],headers,...rows]);
+  ws['!cols']=[{wch:13},{wch:10},{wch:10},{wch:10},{wch:16},{wch:18},{wch:16},{wch:16},{wch:14}];
   return ws;
 }
 
-function expData() {
-  const d = localStorage.getItem('kg_guias') || '[]';
-  const b = new Blob([d], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(b);
-  a.download = `kamke_guias_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
+// ═══════════════════════
+// UTILS
+// ═══════════════════════
+function showAlrt(zone, msg, type) {
+  const el=document.getElementById('alrt-'+zone);
+  if (!el) return;
+  el.className='alert '+type; el.textContent=msg;
+  setTimeout(()=>el.className='alert',7000);
+}
+function closeModal() { document.getElementById('modal').classList.remove('on'); }
+document.getElementById('modal').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
+
+function resetFg() {
+  document.getElementById('fg').reset();
+  const s=getSession(); document.getElementById('atd').value=s?.nombre||'';
+  document.getElementById('from-calc-badge').classList.remove('show');
+  document.getElementById('gbl').textContent='Base de cálculo';
+  document.getElementById('gbv').textContent='—';
+  document.getElementById('gtot').textContent='$22.000';
+}
+
+function fmtRut(inp) {
+  let v=inp.value.replace(/[^0-9kK]/g,'');
+  if (v.length>1) { const dv=v.slice(-1).toUpperCase(); v=v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+dv; }
+  inp.value=v;
+}
+
+async function expData() {
+  const items = await db_getAllGuias();
+  const b=new Blob([JSON.stringify(items)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+  a.download=`kamke_guias_${new Date().toISOString().slice(0,10)}.json`; a.click();
 }
 </script>
 </body>
