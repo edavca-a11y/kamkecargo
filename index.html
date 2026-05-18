@@ -1594,6 +1594,32 @@ function calc() {
   const l = +document.getElementById('cl').value || 0;
   const a = +document.getElementById('ca').value || 0;
   const h = +document.getElementById('ch').value || 0;
+
+  // Resaltar campos de medidas vacíos cuando hay peso ingresado
+  ['cl','ca','ch'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.borderColor = (k > 0 && +el.value <= 0) ? '#f59e0b' : '';
+    el.style.boxShadow  = (k > 0 && +el.value <= 0) ? '0 0 0 3px rgba(245,158,11,.15)' : '';
+  });
+
+  // Alerta en tiempo real
+  const alrt = document.getElementById('alrt-calc');
+  if (k > 0 && (l <= 0 || a <= 0 || h <= 0)) {
+    const faltantes = [];
+    if (l <= 0) faltantes.push('Largo');
+    if (a <= 0) faltantes.push('Ancho');
+    if (h <= 0) faltantes.push('Alto');
+    if (alrt) { alrt.className = 'alert er'; alrt.textContent = '⚠️ Faltan medidas: ' + faltantes.join(', ') + ' (cm) — necesarias para calcular el precio por volumen.'; }
+    return;
+  }
+  if (k <= 0) {
+    if (alrt) { alrt.className = 'alert in'; alrt.textContent = 'Ingresa el peso y las medidas del bulto para calcular la tarifa.'; }
+    return;
+  }
+  // Todo completo
+  if (alrt) alrt.className = 'alert';
+  ['cl','ca','ch'].forEach(id => { document.getElementById(id).style.borderColor = ''; document.getElementById(id).style.boxShadow = ''; });
+
   const p = precio(k, l, a, h);
   document.getElementById('r_vm').textContent = p.vm.toFixed(4) + ' m³';
   document.getElementById('r_pv').textContent = fmt(p.ppv);
